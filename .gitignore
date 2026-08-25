@@ -1,0 +1,47 @@
+# ---------------------------------------------------------------------------
+# STM32CubeIDE — saida de build
+# ---------------------------------------------------------------------------
+Debug/
+Release/
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.list
+*.map
+*.su
+*.cyclo
+
+# ---------------------------------------------------------------------------
+# Eclipse / CubeIDE — estado local do workspace
+# ---------------------------------------------------------------------------
+.settings/
+.metadata/
+RemoteSystemsTempFiles/
+*.launch
+*.bak
+
+# ---------------------------------------------------------------------------
+# Documentacao de fornecedor
+# ---------------------------------------------------------------------------
+# O user manual da Infineon nao vai para o repositorio: e material com
+# copyright de terceiros e tem ~17 MB. Baixar de infineon.com conforme
+# indicado no README.
+docs/*usermanual*.pdf
+docs/*datasheet*.pdf
+
+# ---------------------------------------------------------------------------
+# Sistema operacional
+# ---------------------------------------------------------------------------
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ---------------------------------------------------------------------------
+# Rastreados de proposito (nao remover das excecoes):
+#   .project, .cproject  -> sem eles o CubeIDE nao abre o projeto
+#   *.ioc, .mxproject    -> configuracao do CubeMX
+#   *.ld                 -> linker scripts, alterados na fase 4
+#   Drivers/             -> HAL/CMSIS gerados; necessarios para compilar
+# ---------------------------------------------------------------------------

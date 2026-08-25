@@ -1,0 +1,24 @@
+# Normaliza fim de linha no repositorio (LF), independente do SO de quem clona.
+* text=auto eol=lf
+
+# Fontes
+*.c    text eol=lf
+*.h    text eol=lf
+*.s    text eol=lf
+*.ld   text eol=lf
+*.md   text eol=lf
+*.html text eol=lf
+
+# Arquivos de projeto do CubeIDE / CubeMX
+*.ioc       text eol=lf
+.project    text eol=lf
+.cproject   text eol=lf
+.mxproject  text eol=lf
+
+# Binarios: nunca converter nem tentar diff textual
+*.pdf  binary
+*.png  binary
+*.jpg  binary
+*.bin  binary
+*.hex  binary
+*.elf  binary

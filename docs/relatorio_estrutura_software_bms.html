@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BMS TLE9012 — Estrutura de Software</title>
+<!-- Rev 1.1: MCU alterado de STM32G474RET6 para STM32G491RET6 (NUCLEO-G491RE) -->
+
+<style>
+  :root{
+    --azul:#407E93;
+    --azul-esc:#2F5F70;
+    --ciano:#4FC3D6;
+    --texto:#373435;
+    --cinza:#849196;
+    --linha:#DDE3E6;
+    --fundo-sut:#F4F7F8;
+    --ok:#3E8E5A;
+    --alerta:#B3721E;
+    --risco:#A6413B;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:0; background:#EBEFF1; color:var(--texto);
+    font-family:"Segoe UI",-apple-system,Roboto,Helvetica,Arial,sans-serif;
+    font-size:10.5pt; line-height:1.55;
+  }
+  .pagina{max-width:840px; margin:24px auto; background:#fff; box-shadow:0 2px 14px rgba(0,0,0,.10);}
+
+  /* ---------- Cabecalho ---------- */
+  .topo{padding:26px 44px 18px;}
+  .topo img{width:220px; height:auto; display:block;}
+  .faixa{
+    background:var(--azul); color:#fff; padding:16px 44px 18px;
+    display:flex; justify-content:space-between; align-items:flex-end; gap:24px;
+  }
+  .faixa h1{margin:0; font-size:19pt; font-weight:700; letter-spacing:.2px;}
+  .faixa .sub{margin:4px 0 0; font-size:9.5pt; opacity:.92;}
+  .faixa .meta{text-align:right; font-size:8.5pt; line-height:1.5; opacity:.95; white-space:nowrap;}
+  .identificacao{padding:12px 44px; border-bottom:1px solid var(--linha); font-size:8.5pt; color:var(--cinza);}
+  .identificacao strong{color:var(--texto);}
+
+  /* ---------- Conteudo ---------- */
+  main{padding:8px 44px 40px;}
+  h2{
+    font-size:12pt; color:var(--azul); margin:34px 0 4px; padding-bottom:5px;
+    border-bottom:1.5px solid var(--azul); text-transform:uppercase; letter-spacing:.6px;
+  }
+  h3{font-size:10.8pt; margin:22px 0 6px; color:var(--azul-esc);}
+  h4{font-size:9.8pt; margin:16px 0 4px; color:var(--texto);}
+  p{margin:9px 0;} ul,ol{margin:9px 0; padding-left:22px;} li{margin:4px 0;}
+  code{
+    font-family:Consolas,"Courier New",monospace; font-size:9.3pt;
+    background:var(--fundo-sut); padding:1px 5px; border-radius:3px;
+    border:1px solid var(--linha); color:var(--azul-esc);
+  }
+  .rot{font-size:7.5pt; text-transform:uppercase; letter-spacing:.8px; color:var(--cinza);}
+
+  /* ---------- Indice ---------- */
+  .indice{background:var(--fundo-sut); border:1px solid var(--linha); padding:16px 22px; margin:18px 0 6px;}
+  .indice .rot{margin-bottom:8px;}
+  .indice ol{margin:0; padding-left:20px; font-size:9.2pt;}
+  .indice > ol > li{margin:5px 0;}
+  .indice ol ol{padding-left:18px; margin:2px 0; color:var(--cinza);}
+  .indice a{color:var(--texto); text-decoration:none;}
+
+  /* ---------- Caixas ---------- */
+  .decisao{border:1.5px solid var(--azul); border-left:5px solid var(--azul); background:var(--fundo-sut); padding:16px 20px; margin:16px 0 6px;}
+  .decisao .peca{font-size:15pt; font-weight:700; color:var(--azul); font-family:Consolas,monospace;}
+  .decisao p{margin:8px 0 0; font-size:9.8pt;}
+  .aviso{border-left:4px solid var(--alerta); background:#FCF7EE; padding:12px 16px; margin:14px 0; font-size:9.3pt;}
+  .aviso .rot{color:var(--alerta); margin-bottom:3px;}
+  .nota{border-left:4px solid var(--cinza); background:var(--fundo-sut); padding:12px 16px; margin:14px 0; font-size:9.3pt; color:#4A5458;}
+  .nota .rot{margin-bottom:3px;}
+  .regra{border-left:4px solid var(--risco); background:#FDF5F4; padding:12px 16px; margin:14px 0; font-size:9.3pt;}
+  .regra .rot{color:var(--risco); margin-bottom:3px;}
+
+  /* ---------- Tabelas ---------- */
+  table{width:100%; border-collapse:collapse; margin:12px 0; font-size:9pt;}
+  thead td{background:var(--azul); color:#fff; font-weight:600; padding:7px 9px; font-size:8pt; text-transform:uppercase; letter-spacing:.5px;}
+  tbody td{padding:7px 9px; border-bottom:1px solid var(--linha); vertical-align:top;}
+  tbody tr:nth-child(even){background:#FAFCFC;}
+  .destaque td{background:#E8F1F4 !important; font-weight:600;}
+  .sim{color:var(--ok); font-weight:600;}
+  .nao{color:var(--risco); font-weight:600;}
+  td.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
+  td.id{font-family:Consolas,monospace; font-weight:600; color:var(--azul-esc); white-space:nowrap;}
+
+  /* ---------- Diagrama ---------- */
+  .arq{
+    background:var(--fundo-sut); border:1px solid var(--linha); padding:14px 18px; margin:12px 0;
+    font-family:Consolas,"Courier New",monospace; font-size:8.6pt; line-height:1.7;
+    white-space:pre; overflow-x:auto; color:var(--azul-esc);
+  }
+
+  /* ---------- Referências ---------- */
+  .refs{margin:18px 0;}
+  .refs li{margin:5px 0;}
+  footer{border-top:1px solid var(--linha); margin:0 44px; padding:14px 0 26px; font-size:7.8pt; color:var(--cinza); text-align:center;}
+
+  @page{ size:A4; margin:12mm 0; }
+  @media print{
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    .topo,.faixa,.identificacao,main{ padding-left:14mm; padding-right:14mm; }
+    footer{ margin-left:14mm; margin-right:14mm; }
+    body{background:#fff;}
+    .pagina{box-shadow:none; margin:0; max-width:none;}
+  }
+</style>
+</head>
+<body>
+<div class="pagina">
+
+<!-- ========== CABECALHO ========== -->
+<div class="topo"><img src="logo_ampera.png" alt="AMPERA"></div>
+<div class="faixa">
+  <div>
+    <h1>Estrutura de Software &mdash; BMS</h1>
+    <div class="sub">Battery Management System com TLE9012DQU + TLE9015DQU + STM32G491RET6</div>
+  </div>
+  <div class="meta">
+    Documento T&eacute;cnico<br>
+    Rev. 1.3<br>
+    2026-08-25
+  </div>
+</div>
+<div class="identificacao">
+  <strong>Equipe:</strong> AMPERA &nbsp;&bull;&nbsp;
+  <strong>Autor:</strong> Guilherme Lettmann
+</div>
+
+<!-- ========== SUMARIO ========== -->
+<main>
+<div class="indice">
+  <div class="rot">Sum&aacute;rio</div>
+  <ol>
+    <li><a href="#s1">Vis&atilde;o Geral da Arquitetura</a>
+      <ol>
+        <li><a href="#s1">Hardware de Desenvolvimento</a></li>
+        <li><a href="#s1">Fases de Implementa&ccedil;&atilde;o</a></li>
+      </ol>
+    </li>
+    <li><a href="#s2">Mapa de Mem&oacute;ria Flash</a></li>
+    <li><a href="#s3">Bootloader CAN</a></li>
+    <li><a href="#s4">Tabela de Par&acirc;metros</a></li>
+    <li><a href="#s5">Firmware de Aplica&ccedil;&atilde;o</a>
+      <ol>
+        <li><a href="#s51">M&oacute;dulos</a></li>
+        <li><a href="#s52">M&aacute;quina de Estados</a></li>
+      </ol>
+    </li>
+    <li><a href="#s6">Driver TLE9012 / TLE9015</a>
+      <ol>
+        <li><a href="#s61">Protocolo iso UART</a></li>
+        <li><a href="#s62">Estrutura do Frame</a></li>
+        <li><a href="#s63">CRC SAE-J1850</a></li>
+        <li><a href="#s64">Sequ&ecirc;ncia de Inicializa&ccedil;&atilde;o</a></li>
+        <li><a href="#s65">Leitura de Tens&otilde;es</a></li>
+        <li><a href="#s66">Leitura de Temperatura</a></li>
+        <li><a href="#s67">Portabilidade &mdash; Isolamento do Transporte</a></li>
+        <li><a href="#s68">Configura&ccedil;&atilde;o do Perif&eacute;rico no STM32CubeMX</a></li>
+      </ol>
+    </li>
+    <li><a href="#s7">Estrutura de Diret&oacute;rios do Projeto</a></li>
+    <li><a href="#s8">Fluxo de Atualiza&ccedil;&atilde;o em Campo</a></li>
+    <li><a href="#s9">Refer&ecirc;ncias</a>
+      <ol>
+        <li><a href="#s9">Uso da Biblioteca de Refer&ecirc;ncia</a></li>
+      </ol>
+    </li>
+  </ol>
+</div>
+
+<!-- ========== 1. VISAO GERAL ========== -->
+<h2 id="s1">1. Vis&atilde;o Geral da Arquitetura</h2>
+
+<p>O software do BMS &eacute; dividido em tr&ecirc;s camadas independentes, armazenadas em regi&otilde;es distintas da flash do STM32G491RET6:</p>
+
+<div class="arq">
++------------------------------------------------------+
+|                   STM32G491RET6                      |
+|                                                      |
+|  +----------------+  +----------------------------+  |
+|  |   BOOTLOADER   |  |   TABELA DE PARAMETROS     |  |
+|  |   (CAN bus)    |  |   (flash page dedicada)    |  |
+|  +-------+--------+  +-------------+--------------+  |
+|          |                          |                 |
+|          v                          v                 |
+|  +-------+------------------------------+--------+   |
+|  |       FIRMWARE DE APLICACAO (BMS)              |   |
+|  |                                                |   |
+|  |  +----------+  +-----------+  +------------+   |   |
+|  |  | Driver   |  | Protecoes |  | Comunic.   |   |   |
+|  |  | TLE9012  |  | OV/UV/OT  |  | CAN app    |   |   |
+|  |  +----------+  +-----------+  +------------+   |   |
+|  +------------------------------------------------+   |
+|                                                      |
+|           UART               FDCAN1                  |
+|            |                   |                      |
++------------|-------------------|---------------------+
+             |                   |
+       +-----+------+      +----+----+
+       | TLE9015DQU |      | CAN Bus |
+       +-----+------+      +---------+
+             |
+      iso UART daisy-chain
+             |
+       +-----+------+
+       | TLE9012DQU |  (ate 10 em cadeia)
+       +------------+
+</div>
+
+<p>Objetivo principal: permitir que mudan&ccedil;as de configura&ccedil;&atilde;o (n&uacute;mero de c&eacute;lulas, thresholds, IDs CAN, etc.) sejam feitas <strong>apenas alterando par&acirc;metros</strong>, sem recompila&ccedil;&atilde;o. Atualiza&ccedil;&otilde;es de firmware s&atilde;o feitas via <strong>bootloader CAN</strong>, eliminando a necessidade de programador f&iacute;sico.</p>
+
+<h3>1.1 Hardware de Desenvolvimento</h3>
+<table>
+<thead>
+  <tr><td>Item</td><td>Componente</td><td>Observa&ccedil;&atilde;o</td></tr>
+</thead>
+<tbody>
+  <tr><td>MCU</td><td class="id">NUCLEO-G491RE</td><td>Cortex-M4F @170 MHz, 512 KB flash, 128 KB RAM, 3&times; FDCAN, ST-LINK integrado</td></tr>
+  <tr><td>Transceiver</td><td class="id">AURIX TLE9015 Adapter Board V2.0</td><td>Sinais acess&iacute;veis por test points / header COM6 &mdash; n&atilde;o exige AURIX</td></tr>
+  <tr><td>Sensing</td><td class="id">BMS Balancing and Sensing Board V6</td><td>TLE9012DQU + 12 canais + ladder resistivo on-board</td></tr>
+  <tr><td>Debug</td><td class="id">ST-LINK (on-board)</td><td>SWD + VCP para <code>printf</code> pelo mesmo cabo USB</td></tr>
+</tbody>
+</table>
+
+<div class="nota">
+  <div class="rot">Nota &mdash; escolha do MCU</div>
+  O STM32G491RET6 &eacute; equivalente ao STM32G474RET6 para esta aplica&ccedil;&atilde;o: mesma fam&iacute;lia STM32G4,
+  mesmo core, mesma flash e mesmo n&uacute;mero de FDCAN. A diferen&ccedil;a relevante &eacute; o HRTIM, presente
+  apenas no G474 e sem uso neste projeto. Um AURIX TC375 foi considerado (ASIL-D, lockstep, tri-core),
+  mas descartado para a fase de bring-up: a grava&ccedil;&atilde;o de flash no AURIX &eacute; substancialmente mais
+  complexa (bursts de p&aacute;gina, rotinas executadas de PSPR, UCBs), o que encarece o bootloader CAN
+  sem benef&iacute;cio funcional para 12 c&eacute;lulas. A op&ccedil;&atilde;o permanece aberta &mdash; ver se&ccedil;&atilde;o 6.7.
+</div>
+
+<h3>1.2 Fases de Implementa&ccedil;&atilde;o</h3>
+<p>O bootloader &eacute; a &uacute;ltima etapa, n&atilde;o a primeira. At&eacute; l&aacute;, grava&ccedil;&atilde;o e depura&ccedil;&atilde;o s&atilde;o feitas normalmente pelo ST-LINK.</p>
+
+<table>
+<thead>
+  <tr><td>Fase</td><td>Escopo</td><td>Endere&ccedil;o do App</td><td>Grava&ccedil;&atilde;o</td></tr>
+</thead>
+<tbody>
+  <tr><td class="num">1</td><td>Driver TLE9012 &mdash; ler as 12 tens&otilde;es via UART</td><td class="id">0x0800 0000</td><td>ST-LINK (SWD)</td></tr>
+  <tr><td class="num">2</td><td>Prote&ccedil;&otilde;es, temperatura, balanceamento</td><td class="id">0x0800 0000</td><td>ST-LINK (SWD)</td></tr>
+  <tr><td class="num">3</td><td>Tabela de par&acirc;metros em flash + CAN da aplica&ccedil;&atilde;o</td><td class="id">0x0800 0000</td><td>ST-LINK (SWD)</td></tr>
+  <tr><td class="num">4</td><td>Bootloader CAN</td><td class="id">0x0800 4000</td><td>ST-LINK <em>ou</em> CAN</td></tr>
+</tbody>
+</table>
+
+<div class="nota">
+  <div class="rot">Nota</div>
+  A migra&ccedil;&atilde;o da fase 3 para a 4 exige apenas duas mudan&ccedil;as no app: <code>ORIGIN</code> do linker script
+  para <code>0x08004000</code> e reconfigura&ccedil;&atilde;o do <code>VTOR</code>. O ST-LINK continua gravando e depurando
+  o app normalmente mesmo com o bootloader presente na flash &mdash; as duas vias de grava&ccedil;&atilde;o coexistem.
+</div>
+
+<!-- ========== 2. MAPA DE MEMORIA ========== -->
+<h2 id="s2">2. Mapa de Mem&oacute;ria Flash</h2>
+
+<p>O STM32G491RET6 possui 512 KB de flash. O tamanho de p&aacute;gina depende do bit de op&ccedil;&atilde;o <code>DBANK</code>
+(configura&ccedil;&atilde;o single-bank ou dual-bank) &mdash; consultar RM0440 para o valor efetivo antes de implementar
+o driver de flash. O layout abaixo usa regi&otilde;es m&uacute;ltiplas de 4 KB, portanto permanece v&aacute;lido em
+qualquer uma das duas configura&ccedil;&otilde;es.</p>
+
+<table>
+<thead>
+  <tr><td>Regi&atilde;o</td><td>Endere&ccedil;o Inicial</td><td>Tamanho</td><td>Descri&ccedil;&atilde;o</td></tr>
+</thead>
+<tbody>
+  <tr><td class="id">BOOTLOADER</td><td class="id">0x0800 0000</td><td class="num">16 KB</td><td>Bootloader CAN &mdash; protegido contra escrita (WRP)</td></tr>
+  <tr><td class="id">APP</td><td class="id">0x0800 4000</td><td class="num">480 KB</td><td>Firmware de aplica&ccedil;&atilde;o BMS</td></tr>
+  <tr><td class="id">PARAMS</td><td class="id">0x0807 C000</td><td class="num">8 KB</td><td>Tabela de par&acirc;metros (p&aacute;gina ativa)</td></tr>
+  <tr><td class="id">PARAMS_BKP</td><td class="id">0x0807 E000</td><td class="num">8 KB</td><td>Tabela de par&acirc;metros (backup)</td></tr>
+</tbody>
+</table>
+
+<div class="nota">
+  <div class="rot">Nota</div>
+  O bootloader deve ser protegido com Write Protection (WRP) via option bytes antes de ir a campo,
+  para evitar sobrescrita acidental. Durante o desenvolvimento (fases 1&ndash;3) a WRP fica desabilitada.
+</div>
+
+<div class="aviso">
+  <div class="rot">Aten&ccedil;&atilde;o</div>
+  Nas fases 1 a 3 o app &eacute; compilado no endere&ccedil;o default <code>0x0800 0000</code> e ocupa a flash inteira &mdash;
+  o mapa acima s&oacute; passa a valer na fase 4, quando o bootloader &eacute; introduzido.
+</div>
+
+<!-- ========== 3. BOOTLOADER CAN ========== -->
+<h2 id="s3">3. Bootloader CAN</h2>
+
+<p>O bootloader reside permanentemente na flash e &eacute; executado no reset. Ele decide se entra em modo de atualiza&ccedil;&atilde;o ou pula para a aplica&ccedil;&atilde;o.</p>
+
+<h3>3.1 Condi&ccedil;&otilde;es de Entrada no Bootloader</h3>
+<ol>
+  <li><strong>Flag em RAM persistente</strong> &mdash; a aplica&ccedil;&atilde;o seta um valor m&aacute;gico (ex: <code>0xDEADBEEF</code>) num endere&ccedil;o reservado de RAM e executa reset por software. O bootloader l&ecirc; esse endere&ccedil;o; se encontrar o valor m&aacute;gico, entra em modo de atualiza&ccedil;&atilde;o.</li>
+  <li><strong>Aplicac&atilde;o inv&aacute;lida</strong> &mdash; o bootloader verifica o CRC32 da regi&atilde;o APP armazenado no &uacute;ltimo word da imagem. Se inv&aacute;lido, permanece no bootloader.</li>
+  <li><strong>Comando CAN</strong> &mdash; durante uma janela de 200 ms ap&oacute;s o reset, o bootloader escuta uma mensagem CAN de solicita&ccedil;&atilde;o de atualiza&ccedil;&atilde;o.</li>
+</ol>
+
+<h3>3.2 Protocolo de Atualiza&ccedil;&atilde;o</h3>
+
+<table>
+<thead>
+  <tr><td>Passo</td><td>Dire&ccedil;&atilde;o</td><td>CAN ID</td><td>Conte&uacute;do</td></tr>
+</thead>
+<tbody>
+  <tr><td class="num">1</td><td>PC &rarr; MCU</td><td class="id">0x600</td><td>Comando ENTER_BOOTLOADER</td></tr>
+  <tr><td class="num">2</td><td>MCU &rarr; PC</td><td class="id">0x601</td><td>ACK + vers&atilde;o do bootloader</td></tr>
+  <tr><td class="num">3</td><td>PC &rarr; MCU</td><td class="id">0x600</td><td>ERASE_APP (apaga regi&atilde;o APP)</td></tr>
+  <tr><td class="num">4</td><td>MCU &rarr; PC</td><td class="id">0x601</td><td>ACK ap&oacute;s erase completo</td></tr>
+  <tr><td class="num">5</td><td>PC &rarr; MCU</td><td class="id">0x602</td><td>DATA &mdash; pacotes de 8 bytes sequenciais</td></tr>
+  <tr><td class="num">6</td><td>MCU &rarr; PC</td><td class="id">0x601</td><td>ACK a cada p&aacute;gina (4 KB) gravada</td></tr>
+  <tr><td class="num">7</td><td>PC &rarr; MCU</td><td class="id">0x600</td><td>VERIFY &mdash; CRC32 da imagem completa</td></tr>
+  <tr><td class="num">8</td><td>MCU &rarr; PC</td><td class="id">0x601</td><td>ACK/NACK &mdash; resultado da verifica&ccedil;&atilde;o</td></tr>
+  <tr><td class="num">9</td><td>PC &rarr; MCU</td><td class="id">0x600</td><td>JUMP_APP &mdash; reset para a aplica&ccedil;&atilde;o</td></tr>
+</tbody>
+</table>
+
+<div class="aviso">
+  <div class="rot">Aten&ccedil;&atilde;o</div>
+  O FDCAN1 do STM32G491 &eacute; usado tanto pelo bootloader quanto pela aplica&ccedil;&atilde;o. O bootloader configura o CAN com bitrate fixo de 500 kbit/s. A aplica&ccedil;&atilde;o pode reconfigurar conforme a tabela de par&acirc;metros.
+</div>
+
+<h3>3.3 Salto para a Aplica&ccedil;&atilde;o</h3>
+<p>Ap&oacute;s validar a imagem, o bootloader:</p>
+<ol>
+  <li>Desabilita todas as interrup&ccedil;&otilde;es</li>
+  <li>Desinicializa perif&eacute;ricos usados (FDCAN, SysTick)</li>
+  <li>Configura o MSP (Main Stack Pointer) com o valor do primeiro word em <code>0x0800 4000</code></li>
+  <li>Salta para o endere&ccedil;o do Reset_Handler em <code>0x0800 4004</code></li>
+</ol>
+
+<div class="regra">
+  <div class="rot">Requisito</div>
+  O linker script da aplica&ccedil;&atilde;o deve ter <code>FLASH (rx) : ORIGIN = 0x08004000</code> e o VTOR deve ser reconfigurado no <code>SystemInit</code> para <code>0x08004000</code>.
+</div>
+
+<!-- ========== 4. TABELA DE PARAMETROS ========== -->
+<h2 id="s4">4. Tabela de Par&acirc;metros</h2>
+
+<p>Todos os valores configur&aacute;veis do BMS ficam numa struct armazenada nas &uacute;ltimas p&aacute;ginas da flash. A aplica&ccedil;&atilde;o l&ecirc; essa struct no boot e nunca usa constantes hard-coded.</p>
+
+<table>
+<thead>
+  <tr><td>Par&acirc;metro</td><td>Tipo</td><td>Default</td><td>Unidade</td><td>Descri&ccedil;&atilde;o</td></tr>
+</thead>
+<tbody>
+  <tr><td>num_cells</td><td class="id">uint8</td><td class="num">12</td><td>&mdash;</td><td>N&uacute;mero de c&eacute;lulas por TLE9012</td></tr>
+  <tr><td>num_slaves</td><td class="id">uint8</td><td class="num">1</td><td>&mdash;</td><td>N&uacute;mero de TLE9012 na cadeia</td></tr>
+  <tr><td>ov_threshold_mV</td><td class="id">uint16</td><td class="num">4200</td><td>mV</td><td>Threshold de sobretens&atilde;o</td></tr>
+  <tr><td>uv_threshold_mV</td><td class="id">uint16</td><td class="num">2800</td><td>mV</td><td>Threshold de subtens&atilde;o</td></tr>
+  <tr><td>ot_threshold_C</td><td class="id">int16</td><td class="num">60</td><td>&deg;C</td><td>Threshold de sobretemperatura</td></tr>
+  <tr><td>ut_threshold_C</td><td class="id">int16</td><td class="num">-20</td><td>&deg;C</td><td>Threshold de subtemperatura</td></tr>
+  <tr><td>bal_enable</td><td class="id">uint8</td><td class="num">1</td><td>bool</td><td>Habilita balanceamento passivo</td></tr>
+  <tr><td>bal_delta_mV</td><td class="id">uint16</td><td class="num">10</td><td>mV</td><td>Delta para iniciar balanceamento</td></tr>
+  <tr><td>can_bitrate</td><td class="id">uint32</td><td class="num">500000</td><td>bit/s</td><td>Bitrate do CAN da aplica&ccedil;&atilde;o</td></tr>
+  <tr><td>can_base_id</td><td class="id">uint16</td><td class="num">0x100</td><td>&mdash;</td><td>ID base das mensagens CAN TX</td></tr>
+  <tr><td>meas_period_ms</td><td class="id">uint16</td><td class="num">100</td><td>ms</td><td>Per&iacute;odo de medi&ccedil;&atilde;o de tens&atilde;o</td></tr>
+  <tr><td>temp_period_ms</td><td class="id">uint16</td><td class="num">1000</td><td>ms</td><td>Per&iacute;odo de medi&ccedil;&atilde;o de temperatura</td></tr>
+  <tr><td>num_ntc</td><td class="id">uint8</td><td class="num">5</td><td>&mdash;</td><td>N&uacute;mero de sensores NTC por TLE9012</td></tr>
+  <tr><td>uart_baudrate</td><td class="id">uint32</td><td class="num">2000000</td><td>baud</td><td>Baudrate da iso UART &mdash; <strong>m&iacute;nimo 1000000</strong></td></tr>
+  <tr><td>crc32</td><td class="id">uint32</td><td class="num">&mdash;</td><td>&mdash;</td><td>CRC32 da struct (valida&ccedil;&atilde;o)</td></tr>
+</tbody>
+</table>
+
+<div class="nota">
+  <div class="rot">Nota</div>
+  Os par&acirc;metros podem ser atualizados via mensagem CAN sem necessidade de bootloader &mdash; a aplica&ccedil;&atilde;o recebe o comando, apaga a p&aacute;gina de par&acirc;metros, grava a nova struct e reinicia.
+  O campo <code>crc32</code> protege contra corrup&ccedil;&atilde;o; se inv&aacute;lido, a aplica&ccedil;&atilde;o carrega os valores default.
+</div>
+
+<!-- ========== 5. FIRMWARE DE APLICACAO ========== -->
+<h2 id="s5">5. Firmware de Aplica&ccedil;&atilde;o</h2>
+
+<h3 id="s51">5.1 M&oacute;dulos</h3>
+
+<table>
+<thead>
+  <tr><td>M&oacute;dulo</td><td>Arquivo</td><td>Responsabilidade</td></tr>
+</thead>
+<tbody>
+  <tr><td>Main</td><td class="id">main.c</td><td>Init de perif&eacute;ricos, loop principal, scheduler</td></tr>
+  <tr><td>TLE9012 Driver</td><td class="id">tle9012.c/h</td><td>Comunica&ccedil;&atilde;o iso UART, leitura de c&eacute;lulas e temperaturas, balanceamento</td></tr>
+  <tr><td>TLE9015 Driver</td><td class="id">tle9015.c/h</td><td>Init do transceiver, wake-up, sleep</td></tr>
+  <tr><td>CRC</td><td class="id">crc_j1850.c/h</td><td>CRC SAE-J1850 (lookup table) para frames iso UART</td></tr>
+  <tr><td>Par&acirc;metros</td><td class="id">params.c/h</td><td>Leitura/escrita da tabela de par&acirc;metros na flash</td></tr>
+  <tr><td>Prote&ccedil;&otilde;es</td><td class="id">protection.c/h</td><td>L&oacute;gica OV, UV, OT, UT, open-wire &mdash; flags e a&ccedil;&otilde;es</td></tr>
+  <tr><td>Balanceamento</td><td class="id">balancing.c/h</td><td>Algoritmo de balanceamento passivo baseado em delta de tens&atilde;o</td></tr>
+  <tr><td>CAN App</td><td class="id">can_app.c/h</td><td>Transmiss&atilde;o de dados, recep&ccedil;&atilde;o de comandos, atualiza&ccedil;&atilde;o de par&acirc;metros</td></tr>
+  <tr><td>BSP</td><td class="id">bsp.c/h</td><td>Abstra&ccedil;&atilde;o de GPIOs, LEDs, ERR pin</td></tr>
+</tbody>
+</table>
+
+<h3 id="s52">5.2 M&aacute;quina de Estados</h3>
+
+<div class="arq">
+                    +----------+
+         reset ---->|  INIT    |
+                    +----+-----+
+                         |
+              init OK    |   init FAIL
+              +----------+----------+
+              v                     v
+        +-----+------+       +-----+-----+
+        | MONITORING |       |   ERROR   |
+        +-----+------+       +-----+-----+
+              |                     ^
+              | fault detected      |
+              +---------------------+
+              |
+              | bal_enable &&
+              | delta > bal_delta_mV
+              v
+        +-----+------+
+        | BALANCING  |  (retorna a MONITORING
+        +------------+   apos ciclo)
+</div>
+
+<p><strong>INIT:</strong> configura perif&eacute;ricos, carrega par&acirc;metros, inicializa cadeia TLE9012 (atribui NODE_IDs), configura registradores (PART_CONFIG, OV/UV thresholds, TEMP_CONF).</p>
+<p><strong>MONITORING:</strong> loop peri&oacute;dico &mdash; dispara medi&ccedil;&atilde;o (PCVM_START), l&ecirc; 12 tens&otilde;es e temperaturas, verifica prote&ccedil;&otilde;es, transmite via CAN.</p>
+<p><strong>BALANCING:</strong> ativa balanceamento passivo nas c&eacute;lulas acima da tens&atilde;o m&iacute;nima + delta. Desativa durante medi&ccedil;&atilde;o (PBOFF).</p>
+<p><strong>ERROR:</strong> desativa balanceamento, sinaliza via CAN e ERR pin. Permite retry ap&oacute;s comando CAN.</p>
+
+<!-- ========== 6. DRIVER TLE9012 ========== -->
+<h2 id="s6">6. Driver TLE9012 / TLE9015</h2>
+
+<h3 id="s61">6.1 Protocolo iso UART</h3>
+<p>A comunica&ccedil;&atilde;o entre o MCU e o TLE9015 &eacute; feita por UART padr&atilde;o. O TLE9015 converte para iso UART (diferencial, half-duplex, 2 fios com acoplamento capacitivo ou por transformador) e encaminha para a cadeia de TLE9012.</p>
+
+<table>
+<thead>
+  <tr><td>Par&acirc;metro</td><td>Valor</td></tr>
+</thead>
+<tbody>
+  <tr><td>Baudrate</td><td class="num">2 Mbit/s (oficial) &mdash; m&iacute;nimo 1 Mbit/s</td></tr>
+  <tr><td>Data bits</td><td class="num">8</td></tr>
+  <tr><td>Paridade</td><td>Nenhuma</td></tr>
+  <tr><td>Stop bits</td><td class="num">1</td></tr>
+  <tr><td>Dire&ccedil;&atilde;o</td><td>Single-wire half-duplex (TX e RX no mesmo pino)</td></tr>
+</tbody>
+</table>
+
+<div class="regra">
+  <div class="rot">Requisito cr&iacute;tico &mdash; baudrate</div>
+  A iso UART <strong>n&atilde;o funciona abaixo de 1 Mbit/s</strong>. O baudrate oficialmente suportado &eacute; 2 Mbit/s.
+  Os 115200 baud que aparecem na Figura 14 do manual da Infineon referem-se ao <strong>terminal de debug
+  PC&harr;AURIX</strong> (TeraTerm), <em>n&atilde;o</em> ao link iso UART &mdash; confundir os dois leva a um link que
+  jamais estabelece comunica&ccedil;&atilde;o. O pr&oacute;prio menu do firmware de demo confirma
+  (<code>CS 1000000 &rarr; UART baudrate change to 1Mb</code>).
+</div>
+
+<div class="regra">
+  <div class="rot">Requisito cr&iacute;tico &mdash; timing entre bytes</div>
+  Os bytes de um frame devem ser transmitidos <strong>sem atraso significativo entre si</strong>, sob pena de
+  disparar timeout no transceiver iso UART e corromper a mensagem. A 2 Mbit/s cada byte dura 5 &micro;s
+  (10 bits), o que inviabiliza envio byte-a-byte por polling.
+  <strong>Consequ&ecirc;ncia de projeto: o TX deve usar DMA</strong>, entregando os 6 bytes do frame como um bloco
+  cont&iacute;guo ao USART. O RX tamb&eacute;m deve usar DMA (circular) para n&atilde;o perder bytes.
+</div>
+
+<div class="nota">
+  <div class="rot">Nota &mdash; viabilidade no G491</div>
+  A 170 MHz, 2 Mbit/s exige divisor <code>BRR = 85</code> no USART1 &mdash; valor inteiro exato, sem erro de
+  baudrate. &Eacute; justamente essa exig&ecirc;ncia de timing que inviabiliza Arduinos baseados em ATmega328
+  nesta aplica&ccedil;&atilde;o, e que o Cortex-M4 com DMA atende sem dificuldade.
+</div>
+
+<h4>Liga&ccedil;&atilde;o f&iacute;sica MCU &rarr; TLE9015</h4>
+<p>Pelo esquem&aacute;tico do transceiver (Figura 24 do manual), <code>UART_LS</code> &eacute; um <strong>pino &uacute;nico</strong>:
+o host conecta TX e RX a ele atrav&eacute;s da rede <code>R_UART</code> (1,5 k&Omega; t&iacute;pico, &tau; &le; 50 ns &mdash; Tabela 5).
+Trata-se portanto de <strong>single-wire half-duplex</strong>, e n&atilde;o de um par TX/RX independente.</p>
+
+<p>A biblioteca de refer&ecirc;ncia <em>TLE9012_Arduino_Lib</em> (ver se&ccedil;&atilde;o 9) confirma independentemente
+a mesma topologia: <em>&ldquo;cada pino funciona como RX e TX&rdquo;</em>, sendo necess&aacute;rio
+<em>&ldquo;conectar os pinos rx e tx atrav&eacute;s de um resistor s&eacute;rie&rdquo;</em>, com valor t&iacute;pico de
+1 k&Omega; a 1,5 k&Omega; &mdash; coerente com o <code>R_UART</code> da Tabela 5.</p>
+
+<div class="aviso">
+  <div class="rot">Aten&ccedil;&atilde;o</div>
+  Duas op&ccedil;&otilde;es de implementa&ccedil;&atilde;o no STM32: (a) modo single-wire nativo do USART pelo bit <code>HDSEL</code>
+  (<code>HAL_HalfDuplex_Init</code>), em que TX e RX compartilham o pino <code>TX</code> em open-drain; ou
+  (b) manter TX e RX separados no MCU e uni-los externamente pelo resistor s&eacute;rie, como fazem as
+  bibliotecas Arduino. A op&ccedil;&atilde;o (a) dispensa o resistor no lado do MCU, mas exige descartar o eco
+  local de cada byte transmitido. Confirmar a topologia da placa antes de fiar.
+</div>
+
+<table>
+<thead>
+  <tr><td>Sinal (adapter board)</td><td>NUCLEO-G491RE</td><td>Fun&ccedil;&atilde;o</td></tr>
+</thead>
+<tbody>
+  <tr><td class="id">UART_LS</td><td class="id">PA9 &mdash; USART1_TX</td><td>iso UART low-side (single-wire, via R_UART)</td></tr>
+  <tr><td class="id">nSLEEP</td><td class="id">GPIO livre</td><td>Wake-up do transceiver</td></tr>
+  <tr><td class="id">ERRQ</td><td class="id">GPIO (EXTI)</td><td>Sinaliza&ccedil;&atilde;o de erro do transceiver</td></tr>
+  <tr><td class="id">3.3V / GND</td><td class="id">3V3 / GND</td><td>Refer&ecirc;ncia comum &mdash; lado de baixa tens&atilde;o</td></tr>
+</tbody>
+</table>
+
+<div class="nota">
+  <div class="rot">Nota</div>
+  O USART2 (<code>PA2</code>/<code>PA3</code>) do NUCLEO-64 est&aacute; ligado ao VCP do ST-LINK por solder bridges;
+  reserv&aacute;-lo para <code>printf</code> de debug permite acompanhar as tens&otilde;es pelo mesmo cabo USB da grava&ccedil;&atilde;o.
+  Por isso o TLE9015 usa o USART1. A tabela acima &eacute; uma proposta de pinagem, n&atilde;o uma restri&ccedil;&atilde;o do hardware.
+</div>
+
+<div class="regra">
+  <div class="rot">Requisito</div>
+  A NUCLEO-G491RE <strong>n&atilde;o possui transceiver CAN on-board</strong>. Para as fases 3 e 4 &eacute; necess&aacute;rio
+  um transceiver externo (ex.: TJA1051, SN65HVD230) ligado aos pinos do FDCAN1, com terminac&atilde;o de 120 &Omega;.
+</div>
+
+<h3 id="s62">6.2 Estrutura do Frame</h3>
+
+<p>O frame de <strong>escrita</strong> tem 6 bytes; o de <strong>leitura</strong> tem 4 (n&atilde;o possui campo DATA):</p>
+
+<table>
+<thead>
+  <tr><td>Byte</td><td>Campo</td><td>Write</td><td>Read</td><td>Descri&ccedil;&atilde;o</td></tr>
+</thead>
+<tbody>
+  <tr><td class="num">0</td><td class="id">SYNC</td><td class="sim">&#10003;</td><td class="sim">&#10003;</td><td>Sempre <code>0x1E</code> &mdash; sincroniza&ccedil;&atilde;o</td></tr>
+  <tr><td class="num">1</td><td class="id">ID</td><td class="sim">&#10003;</td><td class="sim">&#10003;</td><td>bit[7]: R/W (1=write, 0=read); bits[5:0]: NODE_ID (0x00=n&atilde;o endere&ccedil;ado, 0x3F=broadcast)</td></tr>
+  <tr><td class="num">2</td><td class="id">ADDR</td><td class="sim">&#10003;</td><td class="sim">&#10003;</td><td>Endere&ccedil;o do registrador alvo</td></tr>
+  <tr><td class="num">3&ndash;4</td><td class="id">DATA</td><td class="sim">&#10003;</td><td class="nao">&mdash;</td><td>Dado, big-endian. Ausente no frame de leitura</td></tr>
+  <tr><td class="num">5</td><td class="id">CRC8</td><td class="sim">&#10003;</td><td class="sim">&#10003;</td><td>CRC SAE-J1850 sobre os bytes anteriores</td></tr>
+</tbody>
+</table>
+
+<div class="aviso">
+  <div class="rot">Corre&ccedil;&atilde;o em rela&ccedil;&atilde;o &agrave;s revis&otilde;es 1.0&ndash;1.2</div>
+  As revis&otilde;es anteriores descreviam o frame de leitura como tendo 6 bytes, com o host enviando
+  <code>0x0000</code> no campo DATA. Est&aacute; <strong>incorreto</strong>: o frame de leitura tem 4 bytes.
+  Confere com a Tabela 11 do manual (que lista apenas SYNC / ID / ADDR / CRC) e com a contagem de
+  bytes da biblioteca de refer&ecirc;ncia.
+</div>
+
+<h4>Ordem de bits &mdash; MSB first</h4>
+<p>Os bytes trafegam com o <strong>bit mais significativo primeiro</strong>, ao contr&aacute;rio do UART
+convencional. A biblioteca Arduino contorna isso invertendo os bits por software
+(<code>msb_first_converter</code>) porque o core do Arduino s&oacute; transmite LSB-first.</p>
+
+<div class="decisao">
+  <div class="rot">Vantagem do STM32</div>
+  <div class="peca">CR2.MSBFIRST</div>
+  <p>O USART do STM32 implementa MSB-first em <strong>hardware</strong>, tanto no TX quanto no RX.
+  No CubeMX: USART1 &rarr; Parameter Settings &rarr; Advanced Parameters &rarr; <em>MSB First = Enable</em>.
+  Dispensa completamente a invers&atilde;o de bits por software.</p>
+</div>
+
+<h4>Eco e contagem de bytes</h4>
+<p>Como a linha &eacute; compartilhada, o host <strong>recebe de volta tudo o que transmite</strong>. O driver
+deve descartar o eco antes de interpretar a resposta:</p>
+
+<table>
+<thead>
+  <tr><td>Opera&ccedil;&atilde;o</td><td>Host envia</td><td>Total recebido</td><td>Composi&ccedil;&atilde;o</td></tr>
+</thead>
+<tbody>
+  <tr><td>Read</td><td class="num">4 bytes</td><td class="num">9 bytes</td><td>4 de eco + 5 de resposta</td></tr>
+  <tr><td>Write</td><td class="num">6 bytes</td><td class="num">7 bytes</td><td>6 de eco + 1 byte de reply frame</td></tr>
+</tbody>
+</table>
+
+<h3 id="s63">6.3 CRC &mdash; dois polin&ocirc;mios distintos</h3>
+
+<p>O protocolo usa <strong>dois</strong> CRCs diferentes, um para frames de dados e outro para o reply frame:</p>
+
+<table>
+<thead>
+  <tr><td>CRC</td><td>Aplica&ccedil;&atilde;o</td><td>Polin&ocirc;mio</td><td>Init</td><td>XOR final</td><td>Valida&ccedil;&atilde;o</td></tr>
+</thead>
+<tbody>
+  <tr><td class="id">CRC8</td><td>Frames de dados (read e write)</td><td class="id">0x1D</td><td class="id">0xFF</td><td class="id">0xFF</td><td>Comparar com o byte recebido</td></tr>
+  <tr><td class="id">CRC3</td><td>Reply frame do write (1 byte)</td><td class="id">0xB0</td><td>o pr&oacute;prio byte</td><td>&mdash;</td><td>V&aacute;lido se o resultado for <strong>zero</strong></td></tr>
+</tbody>
+</table>
+
+<p>O CRC8 &eacute; o SAE-J1850: <code>G(z) = z&sup8; + z&sup4; + z&sup3; + z&sup2; + 1</code>. Implementar por lookup table
+de 256 bytes &mdash; a 2 Mbit/s o or&ccedil;amento de tempo por frame &eacute; apertado.</p>
+
+<p>O CRC3 opera sobre o &uacute;nico byte de reply, deslocando 5 vezes com realimenta&ccedil;&atilde;o condicional do
+polin&ocirc;mio <code>0xB0</code>; o frame &eacute; considerado v&aacute;lido quando o resultado &eacute; zero.</p>
+
+<div class="nota">
+  <div class="rot">Nota</div>
+  As revis&otilde;es 1.0&ndash;1.2 documentavam apenas o CRC8. O CRC3 do reply frame foi identificado na
+  implementa&ccedil;&atilde;o de refer&ecirc;ncia (se&ccedil;&atilde;o 9.1) e &eacute; obrigat&oacute;rio para validar confirma&ccedil;&otilde;es de escrita.
+</div>
+
+<h3 id="s64">6.4 Sequ&ecirc;ncia de Inicializa&ccedil;&atilde;o</h3>
+<p>A inicializa&ccedil;&atilde;o atribui NODE_IDs sequencialmente, come&ccedil;ando pelo IC mais pr&oacute;ximo ao transceiver:</p>
+
+<table>
+<thead>
+  <tr><td>Passo</td><td>A&ccedil;&atilde;o</td><td>Frame (hex)</td></tr>
+</thead>
+<tbody>
+  <tr><td class="num">1</td><td>Atribuir NODE_ID = 0x01 ao 1&ordm; IC</td><td class="id">1E 80 36 0001 ED</td></tr>
+  <tr><td class="num">2</td><td>Atribuir NODE_ID = 0x02 ao 2&ordm; IC</td><td class="id">1E 80 36 0002 CA</td></tr>
+  <tr><td class="num">3</td><td>...</td><td>...</td></tr>
+  <tr><td class="num">N</td><td>Atribuir NODE_ID = N ao &uacute;ltimo IC (FN=1)</td><td class="id">1E 80 36 08xx CRC</td></tr>
+</tbody>
+</table>
+
+<div class="nota">
+  <div class="rot">Nota</div>
+  O &uacute;ltimo IC da cadeia deve ter o bit FN (Final Node) setado no campo DATA (bit 11 = 1, ex: <code>0x0804</code> para NODE_ID=4). Sem isso, o broadcast gera timeout na iso UART.
+  O watchdog do TLE9012 deve ser alimentado durante a inicializa&ccedil;&atilde;o, caso contr&aacute;rio o IC volta para sleep e perde o NODE_ID.
+</div>
+
+<h3 id="s65">6.5 Leitura de Tens&otilde;es</h3>
+<ol>
+  <li>Configurar <code>PART_CONFIG</code> (0x01) com as c&eacute;lulas ativas: <code>0x0FFF</code> para 12 c&eacute;lulas</li>
+  <li>Escrever <code>MEAS_CTRL</code> (0x18) com PCVM_START=1, CVM_MODE=16-bit: <code>0xE021</code></li>
+  <li>Aguardar tempo de convers&atilde;o (~2 ms para 16-bit)</li>
+  <li>Ler registradores PCVM_0 (0x19) a PCVM_11 (0x24)</li>
+  <li>Converter: <code>V_cell [V] = (5.0 / 65536) &times; RESULT</code></li>
+</ol>
+
+<div class="decisao">
+  <div class="rot">F&oacute;rmula de Convers&atilde;o</div>
+  <div class="peca">V = (FSR / 2&sup1;&sup6;) &times; RAW</div>
+  <p>Onde FSR = 5,0 V (Full Scale Range do ADC do TLE9012). Para PCVM_0 = <code>0xABCD</code>: V = (5,0 / 65536) &times; 0xABCD = 3,355 V.</p>
+</div>
+
+<h3 id="s66">6.6 Leitura de Temperatura</h3>
+<p>O TLE9012 suporta at&eacute; 5 sensores NTC externos, configurados via <code>TEMP_CONF</code> (0x04). Os resultados ficam em TEMP_RESULT_0 (0x29) a TEMP_RESULT_4 (0x2D). A convers&atilde;o depende do NTC utilizado (tabela de lookup espec&iacute;fica do componente).</p>
+
+<h3 id="s67">6.7 Portabilidade &mdash; Isolamento do Transporte</h3>
+
+<p>O m&oacute;dulo <code>tle9012.c</code> n&atilde;o deve conter <strong>nenhuma chamada de HAL</strong>. Toda a depend&ecirc;ncia
+de hardware &eacute; injetada por uma interface de transporte, o que mant&eacute;m o driver &mdash; montagem de frame,
+CRC, mapa de registradores, convers&otilde;es &mdash; independente do MCU:</p>
+
+<div class="arq">
+typedef struct {
+    bool (*send)(const uint8_t *buf, uint16_t len);
+    bool (*recv)(uint8_t *buf, uint16_t len, uint32_t timeout_ms);
+    void (*delay_us)(uint32_t us);
+} tle9012_transport_t;
+</div>
+
+<p>Consequ&ecirc;ncia pr&aacute;tica: migrar para um AURIX TC375 no futuro exige reimplementar apenas essas tr&ecirc;s
+fun&ccedil;&otilde;es sobre ASCLIN, sem tocar na l&oacute;gica do driver. O mesmo vale para testes unit&aacute;rios em PC, onde
+o transporte pode ser substitu&iacute;do por um <em>mock</em> que reproduz respostas conhecidas do TLE9012.</p>
+
+<h3 id="s68">6.8 Configura&ccedil;&atilde;o do Perif&eacute;rico no STM32CubeMX</h3>
+
+<h4>USART1 &mdash; Parameter Settings</h4>
+<table>
+<thead>
+  <tr><td>Campo</td><td>Valor</td><td>Justificativa</td></tr>
+</thead>
+<tbody>
+  <tr><td>Mode</td><td class="id">Asynchronous</td><td>TX <code>PA9</code>, RX <code>PA10</code> &mdash; casa com os pads LS_TX/LS_RX da adapter board</td></tr>
+  <tr><td>Baud Rate</td><td class="id">2000000</td><td>M&iacute;nimo funcional &eacute; 1 Mbit/s; 2 Mbit/s &eacute; o oficial</td></tr>
+  <tr><td>Word Length</td><td class="id">8 Bits</td><td>Sem paridade</td></tr>
+  <tr><td>Parity / Stop Bits</td><td class="id">None / 1</td><td>&mdash;</td></tr>
+  <tr><td>Data Direction</td><td class="id">Receive and Transmit</td><td>&mdash;</td></tr>
+  <tr><td>Over Sampling</td><td class="id">16</td><td>A 170 MHz resulta em <code>BRR = 85</code> exato</td></tr>
+  <tr class="destaque"><td>Advanced &rarr; MSB First</td><td class="id">Enable</td><td><strong>Obrigat&oacute;rio</strong> &mdash; protocolo &eacute; MSB-first (se&ccedil;&atilde;o 6.2)</td></tr>
+  <tr><td>Advanced &rarr; Auto Baudrate</td><td class="id">Disable</td><td>&mdash;</td></tr>
+  <tr><td>Advanced &rarr; TX/RX Swap</td><td class="id">Disable</td><td>&mdash;</td></tr>
+</tbody>
+</table>
+
+<p>Alternativa: modo <em>Single Wire (Half-Duplex)</em>, que usa apenas <code>PA9</code> em open-drain
+bidirecional. Nesse caso o resistor s&eacute;rie fica por conta do projetista. Ambos os modos produzem
+eco &mdash; a diferen&ccedil;a &eacute; apenas o n&uacute;mero de fios.</p>
+
+<h4>USART1 &mdash; DMA Settings</h4>
+<table>
+<thead>
+  <tr><td>Request</td><td>Direction</td><td>Mode</td><td>Priority</td><td>Data Width</td></tr>
+</thead>
+<tbody>
+  <tr><td class="id">USART1_TX</td><td>Memory &rarr; Peripheral</td><td class="id">Normal</td><td>High</td><td>Byte / Byte</td></tr>
+  <tr><td class="id">USART1_RX</td><td>Peripheral &rarr; Memory</td><td class="id">Circular</td><td>Very High</td><td>Byte / Byte</td></tr>
+</tbody>
+</table>
+
+<p><em>Increment Address</em>: apenas <strong>Memory</strong> marcado (default do CubeMX, correto).</p>
+
+<div class="nota">
+  <div class="rot">Nota &mdash; por que Circular no RX</div>
+  O protocolo &eacute; request/response e o host recebe o pr&oacute;prio eco. Em modo <em>Normal</em>, o DMA
+  precisaria ser re-armado entre frames, e a 2 Mbit/s a resposta do escravo pode chegar exatamente
+  dentro dessa janela. Em modo <em>Circular</em> a recep&ccedil;&atilde;o nunca para, eliminando a janela de perda.
+  O DMAMUX do STM32G4 roteia os requests automaticamente &mdash; nada a configurar manualmente.
+</div>
+
+<h4>NVIC Settings</h4>
+<ul>
+  <li><strong>USART1 global interrupt: Enable</strong> &mdash; necess&aacute;rio para detec&ccedil;&atilde;o de linha ociosa
+      (<code>HAL_UARTEx_ReceiveToIdle_DMA</code>), que delimita o fim do frame</li>
+  <li><code>DMA1 channelX global interrupt</code> &mdash; habilitados automaticamente ao adicionar os
+      requests; apenas conferir</li>
+</ul>
+
+<h4>Demais perif&eacute;ricos</h4>
+<table>
+<thead>
+  <tr><td>Item</td><td>Configura&ccedil;&atilde;o</td><td>Fase</td></tr>
+</thead>
+<tbody>
+  <tr><td>Clock</td><td>HSI16 &rarr; PLL (M=4, N=85, R=2) = <strong>170 MHz</strong>; Flash 4WS + PWR boost mode</td><td class="num">1</td></tr>
+  <tr><td>USART2</td><td><code>PA2</code>/<code>PA3</code>, 115200, ass&iacute;ncrono, sem DMA &mdash; VCP do ST-LINK para <code>printf</code></td><td class="num">1</td></tr>
+  <tr><td>Watchdog do TLE9012</td><td>Sem perif&eacute;rico dedicado &mdash; SysTick + timer por software</td><td class="num">1</td></tr>
+  <tr><td>FDCAN1</td><td>Adiar; exige transceiver externo</td><td class="num">3</td></tr>
+</tbody>
+</table>
+
+<div class="aviso">
+  <div class="rot">Aten&ccedil;&atilde;o</div>
+  O watchdog interno do TLE9012 <strong>reseta o NODE_ID</strong> se n&atilde;o for alimentado dentro do intervalo
+  configurado (WDOG_CNT.WD_CNT), inclusive durante a pr&oacute;pria inicializa&ccedil;&atilde;o da cadeia. O tick de
+  <em>watchdog kick</em> precisa existir desde a fase 1, antes mesmo de qualquer leitura de tens&atilde;o.
+</div>
+
+<div class="nota">
+  <div class="rot">Nota &mdash; caminho para ASIL</div>
+  Caso o BMS evolua para o AMS definitivo do ve&iacute;culo e seja exigido n&iacute;vel de integridade de seguran&ccedil;a
+  (lockstep, ASIL-D), o AURIX TC375 volta a ser candidato. A decis&atilde;o pode ser adiada sem custo desde que
+  o isolamento de transporte descrito acima seja respeitado desde a fase 1.
+</div>
+
+<!-- ========== 7. ESTRUTURA DE DIRETORIOS ========== -->
+<h2 id="s7">7. Estrutura de Diret&oacute;rios do Projeto</h2>
+
+<div class="arq">
+bms_tle9012/
++-- docs/
+|   +-- relatorio_estrutura_software_bms.html
+|   +-- relatorio_estrutura_software_bms.pdf
+|   +-- infineon-...-usermanual-en.pdf
+|
++-- bootloader/                  (projeto STM32CubeIDE separado)
+|   +-- Core/Src/
+|   |   +-- main.c               bootloader main
+|   |   +-- can_boot.c/h         protocolo CAN de atualizacao
+|   |   +-- flash_if.c/h         interface flash (erase/write/verify)
+|   +-- STM32G491RETX_FLASH.ld   linker: ORIGIN = 0x08000000, LENGTH = 16K
+|
++-- app/                         (projeto STM32CubeIDE principal)
+|   +-- Core/Src/
+|   |   +-- main.c
+|   |   +-- tle9012.c/h
+|   |   +-- tle9015.c/h
+|   |   +-- crc_j1850.c/h
+|   |   +-- params.c/h
+|   |   +-- protection.c/h
+|   |   +-- balancing.c/h
+|   |   +-- can_app.c/h
+|   |   +-- bsp.c/h
+|   +-- STM32G491RETX_FLASH.ld   linker: fases 1-3 -> ORIGIN = 0x08000000
+|                                        fase 4    -> ORIGIN = 0x08004000, LENGTH = 480K
+|
++-- tools/
+    +-- flash_tool.py            script Python para envio de firmware via CAN
+    +-- param_tool.py            script Python para configurar parametros via CAN
+</div>
+
+<!-- ========== 8. FLUXO DE ATUALIZACAO ========== -->
+<h2 id="s8">8. Fluxo de Atualiza&ccedil;&atilde;o em Campo</h2>
+
+<h3>8.1 Atualiza&ccedil;&atilde;o de Firmware (via bootloader CAN)</h3>
+<ol>
+  <li>Conectar adaptador CAN-USB ao barramento (ex: PCAN-USB, CANable)</li>
+  <li>Executar <code>flash_tool.py --port CAN0 --file app.bin</code></li>
+  <li>O script envia comando ENTER_BOOTLOADER &rarr; a aplica&ccedil;&atilde;o seta flag em RAM e reseta</li>
+  <li>Bootloader apaga, grava e verifica a nova imagem</li>
+  <li>MCU reinicia na nova aplica&ccedil;&atilde;o</li>
+</ol>
+
+<h3>8.2 Atualiza&ccedil;&atilde;o de Par&acirc;metros (sem bootloader)</h3>
+<ol>
+  <li>Executar <code>param_tool.py --port CAN0 --config params.json</code></li>
+  <li>O script serializa a struct e envia via mensagens CAN segmentadas</li>
+  <li>A aplica&ccedil;&atilde;o grava na flash e reinicia com os novos valores</li>
+</ol>
+
+<div class="decisao">
+  <div class="rot">Vantagem</div>
+  <div class="peca">Zero recompila&ccedil;&atilde;o</div>
+  <p>Para mudar de 12 c&eacute;lulas para 8, ou de OV 4,2 V para 4,15 V, basta editar o <code>params.json</code> e rodar o script. N&atilde;o &eacute; necess&aacute;rio IDE, compilador ou programador.</p>
+</div>
+
+<!-- ========== 9. REFERENCIAS ========== -->
+<h2 id="s9">9. Refer&ecirc;ncias</h2>
+<ol class="refs">
+  <li>Infineon, <em>TLE9012DQU, TLE9015DQU &mdash; User Manual</em>, Rev. 1.0, Z8F80064984, 2022-01-24.</li>
+  <li>STMicroelectronics, <em>STM32G4 Series &mdash; Reference Manual</em>, RM0440 (cobre a linha G491).</li>
+  <li>STMicroelectronics, <em>STM32G491xC/xE &mdash; Datasheet</em>.</li>
+  <li>STMicroelectronics, <em>NUCLEO-G491RE &mdash; User Manual</em> (pinagem, solder bridges do VCP).</li>
+  <li>SAE J1850, <em>Class B Data Communications Network Interface</em> &mdash; CRC polynomial.</li>
+  <li>STMicroelectronics, <em>AN2606 &mdash; STM32 system memory boot mode</em>.</li>
+  <li>MaxMax-embedded, <em>TLE9012_Arduino_Lib</em>, licen&ccedil;a MIT.
+      <br><code>https://github.com/MaxMax-embedded/TLE9012_Arduino_Lib</code></li>
+</ol>
+
+<h3>9.1 Uso da Biblioteca de Refer&ecirc;ncia</h3>
+
+<p>A biblioteca <em>TLE9012_Arduino_Lib</em> &eacute; uma implementa&ccedil;&atilde;o aberta e funcional do driver, validada em
+ESP32 e Arduino Uno R4. Ela n&atilde;o &eacute; port&aacute;vel diretamente (depende de <code>HardwareSerial</code>), mas serve
+como refer&ecirc;ncia de alto valor em tr&ecirc;s pontos:</p>
+
+<ol>
+  <li><strong>Mapa de registradores</strong> &mdash; <code>TLE9012_Makros.h</code> j&aacute; cont&eacute;m endere&ccedil;os e m&aacute;scaras de
+      bitfield transcritos do datasheet, eliminando a etapa mais tediosa e mais sujeita a erro do
+      desenvolvimento.</li>
+  <li><strong>Modelo de API</strong> &mdash; a separa&ccedil;&atilde;o entre acesso de baixo n&iacute;vel
+      (<code>readRegisterSingle</code>, <code>writeRegisterBroadcast</code>) e fun&ccedil;&otilde;es de alto n&iacute;vel
+      (<code>readCellVoltages</code>, <code>startBalancing</code>) &eacute; um bom ponto de partida para a interface
+      do nosso <code>tle9012.c</code>.</li>
+  <li><strong>Tratamento de erros por callback</strong> &mdash; <code>attachErrorHandler()</code> com ponteiros de
+      fun&ccedil;&atilde;o por tipo de falha, aderente &agrave; abordagem de transporte injet&aacute;vel da se&ccedil;&atilde;o 6.7.</li>
+</ol>
+
+<div class="nota">
+  <div class="rot">Nota &mdash; licen&ccedil;a</div>
+  A licen&ccedil;a MIT permite reutiliza&ccedil;&atilde;o e modifica&ccedil;&atilde;o, inclusive em projeto fechado, desde que o aviso de
+  copyright e o texto da licen&ccedil;a sejam preservados. Se trechos forem portados, manter a atribui&ccedil;&atilde;o
+  no cabe&ccedil;alho do arquivo correspondente.
+</div>
+
+<div class="aviso">
+  <div class="rot">Limita&ccedil;&otilde;es conhecidas da refer&ecirc;ncia</div>
+  A pr&oacute;pria biblioteca documenta que o comando <em>multiread</em> n&atilde;o est&aacute; implementado nas vers&otilde;es atuais.
+  Como o multiread &eacute; o mecanismo mais eficiente para ler as 12 tens&otilde;es num &uacute;nico ciclo, essa &eacute; uma
+  funcionalidade que precisar&aacute; ser escrita do zero &mdash; ver registradores MULTI_READ (0x24) e
+  MULTI_READ_CFG (0x25) no manual.
+</div>
+
+</main>
+
+<footer>
+  AMPERA &bull; Documento gerado em 2026-08-25
+</footer>
+
+</div><!-- .pagina -->
+</body>
+</html>
