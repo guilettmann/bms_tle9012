@@ -476,6 +476,7 @@ tle9012_status_t tle9012_read_temp_raw(uint8_t node_id,
       return st;
     }
 
+    out[z].reg    = reg;
     out[z].result = (uint16_t)(reg & TLE9012_TEMP_RESULT_MASK);
     out[z].intc   = (uint8_t)((reg >> TLE9012_TEMP_INTC_SHIFT)
                               & TLE9012_TEMP_INTC_MASK);

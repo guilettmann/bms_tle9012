@@ -135,6 +135,7 @@ tle9012_status_t tle9012_wait_measurement(uint8_t node_id, uint16_t max_polls);
 /** Conteudo bruto de um registrador EXT_TEMP_z, ja decomposto. */
 typedef struct
 {
+  uint16_t reg;      /**< registrador inteiro, sem interpretar              */
   uint16_t result;   /**< RESULT, bits 9:0 -- saida do SD-ADC               */
   uint8_t  intc;     /**< INTC, bits 11:10 -- fonte de corrente usada       */
   bool     valid;    /**< VALID, bit 13 -- resultado novo desde a ultima leitura */

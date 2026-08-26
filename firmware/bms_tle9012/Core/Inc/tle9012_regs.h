@@ -136,6 +136,22 @@
 /** Bits de falha do GEN_DIAG -- os bits 0 a 4 sao status, nao erro. */
 #define TLE9012_DIAG_FAULT_MASK       0xFFE0u
 
+/* --- FAULT_MASK (0x0A), secao 4.10 --------------------------------------- */
+
+/**
+ * Habilita TODOS os tipos de falha a disparar ERR/EMM (bits 6 a 15), com
+ * ERR_PIN (bit 5) em ZERO.
+ *
+ * O bit ERR_PIN inverte o mecanismo:
+ *   0 = pino ERR desativado, **sinal EMM ativo**  <- e o que queremos
+ *   1 = pino ERR ativo, EMM desativado
+ *
+ * Queremos o EMM porque e ele que sobe pela iso UART ate o TLE9015, que por
+ * sua vez aciona ERRQ e ERR_loc_out. O pino ERR do proprio TLE9012 fica no
+ * lado isolado do pack e nao serve para acionar o shutdown do veiculo.
+ */
+#define TLE9012_FAULT_MASK_ALL        0xFFC0u
+
 /** Bit FN (Final Node) no campo de dados do CONFIG. Tabela 10: 0x0804 = FN + ID 4. */
 #define TLE9012_CONFIG_FINAL_NODE     0x0800u
 

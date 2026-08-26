@@ -82,6 +82,44 @@
 #define BMS_OL_MIN_MV       0u
 #define BMS_OL_MAX_MV       0u
 
+/* --- Shutdown circuit ----------------------------------------------------- */
+
+/**
+ * GPIO que comanda o MOSFET do shutdown circuit.
+ *
+ * POLARIDADE OBRIGATORIA -- nivel ALTO fecha o circuito (veiculo liberado),
+ * nivel BAIXO abre (estado seguro).
+ *
+ * O motivo e que o estado seguro precisa ser o estado NAO ENERGIZADO. Com
+ * pull-down externo no gate, MCU desligado, em reset ou com o pino em alta
+ * impedancia deixa o circuito ABERTO. A polaridade inversa produziria um
+ * sistema em que MCU morto = veiculo liberado sem protecao nenhuma.
+ *
+ * O pull-down externo nao e opcional: sem ele, o pino flutuante durante o
+ * reset pode fechar o MOSFET por acaso.
+ */
+#define BMS_SHUTDOWN_PORT       GPIOB
+#define BMS_SHUTDOWN_PIN        GPIO_PIN_1
+#define BMS_SHUTDOWN_CLK_ENABLE __HAL_RCC_GPIOB_CLK_ENABLE
+
+/**
+ * Modo de acionamento do shutdown.
+ *
+ * 0 = NIVEL ESTATICO. Simples, mas tem um furo: um MCU TRAVADO continua
+ *     segurando o pino em alto, e o circuito permanece fechado. Travamento
+ *     de firmware nao abre o shutdown.
+ *
+ * 1 = ONDA QUADRADA (kick). O pino alterna a cada ciclo enquanto tudo estiver
+ *     ok. Exige um retificador/RC externo no gate: enquanto houver pulsos o
+ *     capacitor se mantem carregado e o MOSFET conduz; se os pulsos pararem
+ *     -- por travamento, reset ou perda de alimentacao -- o RC descarrega e o
+ *     circuito abre sozinho.
+ *
+ * O modo 1 e o correto para um AMS, porque cobre a falha do proprio
+ * supervisor. Mantido em 0 por enquanto para casar com o hardware descrito.
+ */
+#define BMS_SHUTDOWN_TOGGLE     0
+
 /* --- Codigo de falha ------------------------------------------------------ */
 
 /**
@@ -143,9 +181,64 @@ typedef enum
 
 /* --- Temperatura --------------------------------------------------------- */
 
-#define BMS_NUM_TEMP        5u    /* TMP0 a TMP4                              */
-#define BMS_TEMP_INTC       1u    /* fonte de corrente ITMPz_1                */
-#define BMS_TEMP_OT_THR     0u    /* 0 desativa a deteccao de sobretemperatura */
+#define BMS_NUM_TEMP        5u    /* tamanho dos vetores: maximo do CI        */
+
+/**
+ * Quantos canais de temperatura estao REALMENTE ligados.
+ *
+ * Precisa bater com o hardware. Configurar canais sem NTC faz o teste de
+ * mux do TLE9012 falhar neles, o que seta PD_ERR no EXT_TEMP_z -- e PD_ERR
+ * esta ligado ao EXT_T_ERR do GEN_DIAG. O sintoma e sobretemperatura
+ * disparando na inicializacao, independentemente do limiar de OT.
+ *
+ * Aumentar conforme forem sendo plugados NTCs, sempre a partir do TMP0:
+ * o campo NR_TEMP_SENSE ativa uma sequencia, nao canais avulsos.
+ */
+#define BMS_NUM_TEMP_USED   1u
+/**
+ * Fonte de corrente para a comparacao de sobretemperatura (TEMP_CONF.I_NTC).
+ *
+ * TEM QUE BATER com a fonte que a MEDICAO usa, lida em EXT_TEMP_z.INTC.
+ * Sao campos distintos: I_NTC escolhe a fonte da comparacao de OT, INTC
+ * informa a que foi usada na conversao. Se divergirem, o limiar e comparado
+ * contra um valor com escala diferente -- e a escala muda por 4 a cada nivel.
+ *
+ * Medido em bancada: EXT_TEMP_0 = 0x2244 -> INTC = 0. Por isso 0 aqui.
+ * Com I_NTC = 1 e INTC = 0, a comparacao usava um RESULT 4x menor que o
+ * reportado e a sobretemperatura disparava com o NTC a 24 C.
+ *
+ * Se trocar NTC ou resistores e o INTC mudar, este valor muda junto.
+ */
+#define BMS_TEMP_INTC       0u
+/**
+ * Limiar de SOBRETEMPERATURA, em codigo bruto de 10 bits (EXT_OT_THR).
+ *
+ * Ao contrario da subtemperatura, esta protecao e do HARDWARE: o TLE9012
+ * compara sozinho e seta EXT_T_ERR no GEN_DIAG, sem depender do firmware.
+ *
+ * Dispara quando o RESULT do ADC fica ABAIXO do limiar, porque a resistencia
+ * do NTC cai conforme a temperatura sobe. Zero desativa.
+ *
+ * 292 = 60 C, para a cadeia atual, com INTC = 0 MEDIDO em bancada
+ * (EXT_TEMP_0 = 0x2244: VALID=1, PD_ERR=0, INTC=0, RESULT=580):
+ *   60 C -> R_NTC 2486 ohm
+ *        -> em paralelo com os 5197 da placa = 1682 ohm
+ *        -> mais R_TMP de 100 ohm            = 1782 ohm
+ *        -> RESULT = 1782 * 4096 / (25000 * 4^0) = 292
+ *
+ * Referencia rapida:  40 C = 446 | 50 C = 364 | 60 C = 292
+ *                     70 C = 232 | 80 C = 184
+ *
+ * ATENCAO: o RESULT escala por 4 a cada nivel de INTC. Uma versao anterior
+ * usava 73, calculado assumindo INTC = 1 sem verificar -- erro de fator 4.
+ * TEMP_CONF.I_NTC seleciona a fonte usada para a FALHA de OT, enquanto
+ * EXT_TEMP_z.INTC informa a que foi usada na MEDICAO; nao sao a mesma coisa.
+ * Se trocar o NTC, o resistor da placa ou o numero de canais, RELER
+ * temp.intc antes de recalcular.
+ *
+ * DEPENDE tambem de B = 3950, ainda nao confirmado no componente.
+ */
+#define BMS_TEMP_OT_THR     292u
 
 /* Le temperatura a cada 10 ciclos de tensao (1 s). O round robin faz no
  * maximo duas medicoes de temperatura por ciclo, entao nao adianta ler mais
@@ -267,6 +360,15 @@ typedef struct
   uint32_t ohms_raw[BMS_NUM_TEMP];  /**< o que o ADC ve, com o paralelo da placa */
   float    celsius[BMS_NUM_TEMP];   /**< so para leitura humana              */
   uint8_t  valid[BMS_NUM_TEMP];
+
+  /* Cru do registrador. Necessario para calcular o limiar de OT, que e
+   * comparado contra o RESULT e nao contra ohms -- e o RESULT depende da
+   * fonte de corrente que o dispositivo escolheu, que muda a escala por 4. */
+  uint16_t reg[BMS_NUM_TEMP];       /**< EXT_TEMP_z inteiro, sem interpretar */
+  uint16_t result[BMS_NUM_TEMP];    /**< RESULT, bits 9:0                    */
+  uint8_t  intc[BMS_NUM_TEMP];      /**< INTC, fonte de corrente usada       */
+  uint16_t conf_readback;           /**< TEMP_CONF relido -- a config pegou? */
+  uint16_t ext_diag;                /**< EXT_TEMP_DIAG (0x0E)                */
   uint32_t count;
   uint32_t fail_count;
   uint8_t  status;
@@ -308,6 +410,17 @@ typedef struct
   uint16_t latched;             /**< acumula desde o ultimo clear            */
   uint32_t count;               /**< ciclos com alguma falha                 */
   uint8_t  read_status;
+
+  /**
+   * Escrever 1 pelo depurador limpa as falhas latcheadas no dispositivo.
+   *
+   * Existe porque bms_chain_init() so roda quando a cadeia esta caida: uma
+   * falha que trave DEPOIS da inicializacao fica latcheada para sempre, sem
+   * caminho de limpeza. Varias falhas desativam o balanceamento, e algumas
+   * podem afetar o round robin -- sair desse estado precisa ser possivel sem
+   * reiniciar o firmware.
+   */
+  uint8_t clear_request;
 } bms_fault_t;
 
 /** Valores iniciais dos campos que nao comecam em zero. */
@@ -318,6 +431,23 @@ typedef struct
                          .hyst_mv    = BMS_FAULT_HYST_MV, \
                          .ut_thr_ohm = BMS_UT_THR_OHM,  \
                          .ut_enabled = 0u }
+
+/**
+ * Estado do shutdown circuit.
+ *
+ * O travamento (latch) e deliberado: uma vez aberto por falha, o circuito
+ * NAO fecha sozinho quando a condicao some. Recuperacao automatica permitiria
+ * o veiculo se reenergizar sozinho apos um transiente -- inaceitavel. Sair do
+ * estado exige acao explicita, que no veiculo deve ser um botao fisico.
+ */
+typedef struct
+{
+  uint8_t  closed;         /**< 1 = circuito fechado, veiculo liberado       */
+  uint8_t  latched_open;   /**< 1 = travado aberto por falha                 */
+  uint8_t  reset_request;  /**< escrever 1 para destravar (so sem falha)     */
+  bms_fault_code_t cause;  /**< qual falha abriu, preservada apos o evento   */
+  uint32_t open_count;     /**< quantas vezes abriu desde o boot             */
+} bms_shutdown_t;
 
 /** Injecao de falha para demonstracao. */
 typedef struct
@@ -345,6 +475,7 @@ volatile bms_meas_t  meas;
 volatile bms_temp_t  temp;
 volatile bms_fault_t fault = BMS_FAULT_INIT;
 volatile bms_sim_t   sim;
+volatile bms_shutdown_t shutdown;
 
 static uint32_t s_last_good_tick;
 static uint8_t  s_consec_fail;
@@ -475,7 +606,7 @@ static bool bms_chain_init(void)
     return false;
   }
 
-  if (tle9012_config_temp(BMS_NODE_ID, BMS_NUM_TEMP,
+  if (tle9012_config_temp(BMS_NODE_ID, BMS_NUM_TEMP_USED,
                           BMS_TEMP_INTC, BMS_TEMP_OT_THR) != TLE9012_OK)
   {
     return false;
@@ -486,6 +617,37 @@ static bool bms_chain_init(void)
   {
     return false;
   }
+
+  /* Todas as falhas disparam EMM, que sobe pela iso UART ate o TLE9015 e
+   * aciona ERRQ e ERR_loc_out -- caminho de protecao em hardware, que
+   * continua valendo se o firmware travar. */
+  if (tle9012_write_reg(BMS_NODE_ID, TLE9012_REG_FAULT_MASK,
+                        TLE9012_FAULT_MASK_ALL) != TLE9012_OK)
+  {
+    return false;
+  }
+
+  /* Deixa o round robin completar alguns ciclos e SO ENTAO limpa as falhas.
+   *
+   * As primeiras conversoes apos habilitar a temperatura acontecem antes das
+   * fontes de corrente e dos filtros RC assentarem, e sinalizam erro que nao
+   * corresponde a condicao real nenhuma. Limpar aqui separa "falha de
+   * partida" de "falha de verdade" -- sem isto, o EXT_T_ERR fica latcheado
+   * desde o boot e contamina todo o diagnostico daí em diante.
+   *
+   * O watchdog e realimentado durante a espera porque ele nao para de contar. */
+  for (uint8_t i = 0u; i < 5u; i++)
+  {
+    HAL_Delay(100u);
+    (void)tle9012_kick_watchdog(BMS_NODE_ID);
+  }
+
+  (void)tle9012_clear_faults(BMS_NODE_ID);
+
+  fault.latched = 0u;
+  fault.uv      = 0u;
+  fault.ov      = 0u;
+  fault.ut      = 0u;
 
   /* Confirma lendo de volta -- o manual recomenda validar toda escrita de
    * configuracao relendo o registrador (secao 3.1.2). */
@@ -722,7 +884,7 @@ static void bms_apply_simulation(bms_sim_fault_t which)
       /* OT dispara quando o resultado fica ABAIXO do limiar, porque a
        * resistencia do NTC cai com o calor. Limiar no maximo faz qualquer
        * leitura disparar. */
-      st = tle9012_config_temp(BMS_NODE_ID, BMS_NUM_TEMP, BMS_TEMP_INTC,
+      st = tle9012_config_temp(BMS_NODE_ID, BMS_NUM_TEMP_USED, BMS_TEMP_INTC,
                                TLE9012_TEMP_CONF_OT_MASK);
       break;
 
@@ -771,7 +933,7 @@ static void bms_apply_simulation(bms_sim_fault_t which)
                                   BMS_OL_MIN_MV, BMS_OL_MAX_MV);
       if (st == TLE9012_OK)
       {
-        st = tle9012_config_temp(BMS_NODE_ID, BMS_NUM_TEMP,
+        st = tle9012_config_temp(BMS_NODE_ID, BMS_NUM_TEMP_USED,
                                  BMS_TEMP_INTC, BMS_TEMP_OT_THR);
       }
       if (st == TLE9012_OK)
@@ -789,6 +951,79 @@ static void bms_apply_simulation(bms_sim_fault_t which)
 
   sim.apply_status = (uint8_t)st;
   sim.active       = which;
+}
+
+/**
+ * @brief Configura o GPIO do shutdown, ja no estado seguro.
+ *
+ * A ordem importa: escreve nivel BAIXO antes de configurar como saida, para
+ * que o pino nunca passe por um instante em alto durante a inicializacao.
+ */
+static void bms_shutdown_init(void)
+{
+  GPIO_InitTypeDef gpio = {0};
+
+  BMS_SHUTDOWN_CLK_ENABLE();
+
+  HAL_GPIO_WritePin(BMS_SHUTDOWN_PORT, BMS_SHUTDOWN_PIN, GPIO_PIN_RESET);
+
+  gpio.Pin   = BMS_SHUTDOWN_PIN;
+  gpio.Mode  = GPIO_MODE_OUTPUT_PP;
+  gpio.Pull  = GPIO_NOPULL;   /* pull-down e EXTERNO, no gate do MOSFET */
+  gpio.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(BMS_SHUTDOWN_PORT, &gpio);
+
+  shutdown.closed       = 0u;
+  shutdown.latched_open = 0u;
+}
+
+/**
+ * @brief Atualiza o shutdown circuit conforme o estado de falha.
+ *
+ * Fecha somente quando TUDO esta em ordem: cadeia de pe, dado valido, nenhuma
+ * falha e nenhum travamento pendente. Na duvida, abre.
+ */
+static void bms_shutdown_update(bool any_fault)
+{
+  if (any_fault)
+  {
+    if (shutdown.latched_open == 0u)
+    {
+      shutdown.latched_open = 1u;
+      shutdown.cause        = fault.code;   /* preserva o que abriu */
+      shutdown.open_count++;
+    }
+  }
+  else if (shutdown.reset_request != 0u)
+  {
+    /* Destrava so na ausencia de falha: pedido de reset com falha ativa e
+     * ignorado, nunca enfileirado. */
+    shutdown.latched_open  = 0u;
+    shutdown.reset_request = 0u;
+  }
+  else
+  {
+    /* sem falha e sem pedido: mantem o estado atual */
+  }
+
+  const bool allow = (!any_fault) && (shutdown.latched_open == 0u);
+
+#if BMS_SHUTDOWN_TOGGLE
+  /* Onda quadrada: so mantem o RC externo carregado enquanto o loop roda. */
+  if (allow)
+  {
+    HAL_GPIO_TogglePin(BMS_SHUTDOWN_PORT, BMS_SHUTDOWN_PIN);
+  }
+  else
+  {
+    HAL_GPIO_WritePin(BMS_SHUTDOWN_PORT, BMS_SHUTDOWN_PIN, GPIO_PIN_RESET);
+  }
+#else
+  HAL_GPIO_WritePin(BMS_SHUTDOWN_PORT, BMS_SHUTDOWN_PIN,
+                    allow ? GPIO_PIN_SET : GPIO_PIN_RESET);
+#endif
+
+  shutdown.closed = allow ? 1u : 0u;
 }
 
 /** Botao azul da Nucleo: avanca para o proximo modo de simulacao. */
@@ -914,14 +1149,14 @@ static void bms_temp_cycle(void)
   tle9012_temp_raw_t raw[BMS_NUM_TEMP];
 
   const tle9012_status_t st = tle9012_read_temp_raw(BMS_NODE_ID, raw,
-                                                    BMS_NUM_TEMP);
+                                                    BMS_NUM_TEMP_USED);
   temp.status = (uint8_t)st;
 
   if (st != TLE9012_OK)
   {
     temp.fail_count++;
 
-    for (uint8_t z = 0u; z < BMS_NUM_TEMP; z++)
+    for (uint8_t z = 0u; z < BMS_NUM_TEMP_USED; z++)
     {
       temp.valid[z] = 0u;
     }
@@ -929,8 +1164,33 @@ static void bms_temp_cycle(void)
     return;
   }
 
-  for (uint8_t z = 0u; z < BMS_NUM_TEMP; z++)
+  /* Contexto de diagnostico: confirma que a configuracao pegou e mostra os
+   * flags detalhados de temperatura. Sem isto, "tudo zero" nao distingue
+   * "nao configurado" de "configurado mas sem medir". */
   {
+    uint16_t v = 0u;
+
+    if (tle9012_read_reg(BMS_NODE_ID, TLE9012_REG_TEMP_CONF, &v) == TLE9012_OK)
+    {
+      temp.conf_readback = v;
+    }
+
+    if (tle9012_read_reg(BMS_NODE_ID, TLE9012_REG_EXT_TEMP_DIAG, &v)
+        == TLE9012_OK)
+    {
+      temp.ext_diag = v;
+    }
+  }
+
+  for (uint8_t z = 0u; z < BMS_NUM_TEMP_USED; z++)
+  {
+    /* Captura o cru ANTES de qualquer guarda: quando nada funciona, e o
+     * conteudo do registrador que diz por que. Deixar isto depois do teste
+     * de VALID esconde justamente o caso que precisa ser diagnosticado. */
+    temp.reg[z]    = raw[z].reg;
+    temp.result[z] = raw[z].result;
+    temp.intc[z]   = raw[z].intc;
+
     /* O bit VALID e limpo ao ler: se estiver zero, o round robin ainda nao
      * produziu resultado novo para este canal desde a leitura anterior. */
     if (!raw[z].valid)
@@ -1043,6 +1303,10 @@ int main(void)
   MX_DMA_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
+  /* Shutdown no estado seguro ANTES de qualquer outra coisa: o circuito so
+   * fecha depois que a cadeia estiver de pe e sem falha. */
+  bms_shutdown_init();
+
   tle9012_port_init(&huart1);
   tle9012_bind(tle9012_port_transport());
 
@@ -1089,7 +1353,8 @@ int main(void)
       /* Cadeia caida ou ainda nao inicializada: tenta de novo em vez de
        * travar. Inspecionar tp_dbg_avail_on_timeout, depois tle_dbg_rx. */
       meas.valid = 0u;
-      BSP_LED_On(LED_GREEN);   /* cadeia caida tambem e falha */
+      BSP_LED_On(LED_GREEN);        /* cadeia caida tambem e falha */
+      bms_shutdown_update(true);    /* e tem que abrir o shutdown  */
 
       HAL_Delay(500u);
       tle9012_wakeup();
@@ -1114,6 +1379,20 @@ int main(void)
       bms_temp_cycle();
     }
 
+    /* Limpeza de falhas latcheadas, pedida pelo depurador. */
+    if (fault.clear_request != 0u)
+    {
+      fault.clear_request = 0u;
+
+      if (tle9012_clear_faults(BMS_NODE_ID) == TLE9012_OK)
+      {
+        fault.latched = 0u;
+        fault.uv      = 0u;
+        fault.ov      = 0u;
+        fault.ut      = 0u;
+      }
+    }
+
     /* Injecao de falha pedida pelo botao ou pelo depurador. */
     if (sim.request != sim.active)
     {
@@ -1122,12 +1401,17 @@ int main(void)
 
     bms_resolve_fault_code();
 
+    const bool faulted = bms_any_fault();
+
+    /* Shutdown antes do LED: se algo aqui bloquear, o circuito ja abriu. */
+    bms_shutdown_update(faulted);
+
     /* LD2 aceso FIXO = falha. Piscando = vivo e saudavel.
      *
      * Piscar como sinal de saude e proposital: LED apagado passa a significar
      * firmware travado, e nao "tudo bem". Um AMS nao pode ter estado de falha
      * indistinguivel de estado morto. */
-    if (bms_any_fault())
+    if (faulted)
     {
       BSP_LED_On(LED_GREEN);
     }
