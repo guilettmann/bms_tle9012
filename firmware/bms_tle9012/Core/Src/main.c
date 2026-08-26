@@ -90,6 +90,12 @@ volatile uint8_t  smoke_status;     /* tle9012_status_t do readback           */
 volatile uint16_t smoke_config;     /* valor lido do CONFIG (0x36)            */
 volatile uint32_t smoke_attempts;
 
+/* Diagnostico geral do TLE9012, lido a cada smoke test. Se a cadeia nao
+ * sobe, este registrador diz se ha falha latcheada no dispositivo em vez de
+ * problema de link. Ver secao 4.11 do manual para os bits. */
+volatile uint16_t gen_diag;
+volatile uint8_t  gen_diag_status;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -121,6 +127,12 @@ static bool bms_smoke_test(void)
   smoke_attempts++;
   smoke_ok = 0u;
 
+  /* Devolve o IC a NODE_ID = 0 antes de tentar atribuir. Sem isto, um IC que
+   * manteve o ID de uma sessao anterior nunca mais e alcancado: a atribuicao
+   * escreve no no 0, onde nao ha ninguem. E o que impedia o sistema de voltar
+   * sozinho depois de desligar e religar. Inofensivo quando o IC ja esta em 0. */
+  tle9012_force_reset(BMS_NODE_ID);
+
   /* Unico IC na cadeia, portanto ele e tambem o final node. Sem o bit FN
    * o broadcast nunca responde e tudo da timeout. */
   tle9012_status_t st = tle9012_assign_node_id(BMS_NODE_ID, true);
@@ -140,6 +152,25 @@ static bool bms_smoke_test(void)
   if (st != TLE9012_OK)
   {
     return false;
+  }
+
+  /* Le o diagnostico geral. Nao bloqueia a inicializacao -- serve para
+   * distinguir falha latcheada no dispositivo de problema de link. */
+  {
+    uint16_t diag = 0u;
+    gen_diag_status = (uint8_t)tle9012_read_reg(BMS_NODE_ID,
+                                                TLE9012_REG_GEN_DIAG, &diag);
+    if (gen_diag_status == (uint8_t)TLE9012_OK)
+    {
+      gen_diag = diag;
+
+      /* O manual (secao 3.6.2) exige limpar manualmente o PS_ERR_SLEEP, que
+       * pode ficar setado apos o reset de registradores por sleep. */
+      if (diag != 0u)
+      {
+        (void)tle9012_write_reg(BMS_NODE_ID, TLE9012_REG_GEN_DIAG, 0x0000u);
+      }
+    }
   }
 
   /* O NODE_ID atribuido deve aparecer nos bits baixos do CONFIG. */

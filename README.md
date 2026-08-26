@@ -42,10 +42,31 @@ points e no header COM6 — apesar do nome, **não** exige um AURIX.
 |---|---|---|
 | `TXD_LS` | `PC4` (USART1_TX) | Lado do host, antes do `R_UART` |
 | `UART_LS` | `PC5` (USART1_RX) | Nó compartilhado, ligado ao pino do chip |
-| `VS` (test point `VS1`) | `5V` | **Alimentação — faixa 4,75 V a 45 V** |
-| `VIO` | `3V3` | Define o nível lógico (faixa 3 V a 5,5 V) |
+| `VS` (test point `VS1`) | `5V` | **Alimentação do núcleo — faixa 4,75 V a 45 V** |
+| **`VIO`** | **`3V3`** | **Alimentação da interface UART — obrigatório** |
 | `GND` | `GND` | Referência comum |
 | `nSleep` | `PB0` | Opcional — ver nota abaixo |
+
+> ### ⚠️ `VIO` não é opcional — foi o bug mais caro desta bancada
+>
+> `VS` (pino 34) e `VIO` (pino 30) são trilhos **independentes**. O `VS` alimenta o
+> núcleo do chip; o `VIO` alimenta **exclusivamente a interface UART** e define seus
+> níveis lógicos.
+>
+> Com o `VIO` flutuando, a Figura 4 do datasheet é explícita: `V_VIO < V_VIO_th_UV`
+> (2,2 a 2,76 V) → **"UART interface is deactivated"**.
+>
+> **Sintoma:** o transceiver fica vivo do lado da iso UART e **surdo do lado do MCU**.
+> O sistema não sobe sozinho depois de ciclar a energia do transceiver, e só volta se
+> você **desplugar e replugar o cabo iso UART** — porque isso gera transiente no único
+> lado que ainda funciona. Nenhuma correção de firmware resolve, porque o firmware fala
+> justamente pela interface desativada.
+>
+> Pior: o comportamento é **intermitente**, não morto. Pino de alimentação solto fica
+> perto do limiar por caminhos parasitas, então ora passa, ora não.
+>
+> **Ligue `3V3` da Nucleo no `VIO`.** Além de obrigatório, casa os níveis lógicos
+> exatamente com `PC4`/`PC5`, e garante que a interface sobe junto com o MCU.
 
 > **`VS` não funciona com 3,3 V.** O mínimo funcional é 4,75 V (datasheet TLE9015DQU,
 > Tabela 2). Use o pino `5V` da Nucleo — o consumo é ~5 mA em idle e ~15 mA durante
@@ -186,18 +207,31 @@ Complementam o diagnóstico `tle_dbg_tx`, `tle_dbg_rx`, `tle_dbg_status` (bytes 
 
 ---
 
+## Armadilhas resolvidas em bancada
+
+Registradas porque nenhuma delas é óbvia no datasheet e todas custaram tempo:
+
+| Sintoma | Causa | Onde está documentado |
+|---|---|---|
+| Link nunca estabelece | Baudrate abaixo de 1 Mbit/s. Os 115200 do manual são do terminal de debug, não do link | UM Fig. 14 vs. menu do demo |
+| Eco volta, escravo não responde | Ligação transceiver↔sensing precisa ser **cruzada** (`HS`↔`LS`) | UM Fig. 54, seção 3.1 |
+| Transceiver morto com 3,3 V | `VS` exige **4,75 V** mínimo | DS TLE9015 Tab. 2 |
+| **MCU não alcança o transceiver** | **`VIO` flutuando desativa a interface UART** | **DS TLE9015 Fig. 4** |
+| Link cai sozinho após um tempo | Watchdog zera, o IC dorme e reseta o `NODE_ID` | UM seção 4.48 |
+| Não recupera após ciclo de energia | `NODE_ID` retido; precisa de `SLEEP_REG_RESET` antes de reatribuir | UM seção 3.6.2 |
+| Tensões congeladas em valor antigo | Medição falhando sem invalidar o snapshot | defeito próprio, corrigido |
+
 ## Pendências conhecidas
 
-- **Tempo de conversão do PCVM** está como delay fixo de 5 ms. O bit `PCVM_START` se
-  limpa sozinho ao terminar, mas a posição dele (bit 15) foi *deduzida* comparando
-  `0xE021` do PCVM com `0x0E21` do BVM — confirmar na seção 4.23 do manual antes de
-  trocar por polling.
-- **Multiread não implementado.** É o mecanismo mais eficiente para ler as 12 tensões
-  num ciclo só; hoje são 12 transações. Os endereços dos registradores `MULTI_READ` /
-  `MULTI_READ_CFG` precisam ser confirmados na seção 4.2 — não estão em
-  `tle9012_regs.h` justamente para não propagar palpite.
-- **Watchdog do TLE9012** ainda não é alimentado. Ele reseta o `NODE_ID` se não for
-  servido dentro do intervalo de `WDOG_CNT.WD_CNT`.
+- **Ordem das células no multiread não verificada.** O manual descreve `PCVM_SEL = 0xC`
+  como *"Result of Cell 11-0"*, e o parser assume ordem decrescente. Com ladder
+  resistivo todas as células leem igual, então ordem certa e invertida são
+  indistinguíveis. **Confirmar com fonte desbalanceada ou células reais** antes de
+  confiar — é o tipo de erro que só aparece quando o pack desbalanceia, que é
+  exatamente quando o BMS precisa acertar.
+- **Formato do frame de multiread não é documentado.** Os 64 bytes (4 de eco + 12
+  frames de 5) foram determinados observando a rajada real. Vale reconfirmar se mudar
+  a configuração do `MULTI_READ_CFG`.
 - **Sem transceiver CAN** — a Nucleo não tem um on-board; será necessário externo
   (TJA1051 ou SN65HVD230) nas fases 3 e 4.
 

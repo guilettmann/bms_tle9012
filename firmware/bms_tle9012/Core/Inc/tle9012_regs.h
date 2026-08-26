@@ -84,6 +84,16 @@
  */
 #define TLE9012_WDOG_CNT_RELOAD       0x007Fu
 
+/**
+ * OP_MODE com SLEEP_REG_RESET = 1 (Tabela 26).
+ *
+ * Reseta TODOS os registradores -- inclusive os alimentados em sleep -- e
+ * coloca o dispositivo para dormir. Ao acordar, ele volta com NODE_ID = 0.
+ * E o unico jeito documentado de recuperar um IC que ficou com NODE_ID
+ * antigo apos um ciclo de energia incompleto.
+ */
+#define TLE9012_OP_MODE_SLEEP_REG_RESET  0xC404u
+
 /** Fundo de escala do ADC de celula, em milivolts (secao 3.4.1: FSR = 5,0 V). */
 #define TLE9012_PCVM_FSR_MV           5000u
 

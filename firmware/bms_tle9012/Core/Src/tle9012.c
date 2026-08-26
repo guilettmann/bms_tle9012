@@ -171,19 +171,70 @@ tle9012_status_t tle9012_read_reg(uint8_t node_id, uint8_t addr, uint16_t *out)
 
 void tle9012_wakeup(void)
 {
-  uint16_t scratch = 0u;
+  if ((s_tp == NULL) || (s_tp->send == NULL))
+  {
+    return;
+  }
 
-  /* O proprio ato de enviar a leitura acorda o dispositivo; a resposta
-   * normalmente nao vem e isso e esperado. Dois disparos porque o primeiro
-   * pode ser inteiramente consumido pelo despertar. */
+  /* Padrao de wake-up do TLE9015 (datasheet secao 5.1): sinal ALTERNADO de
+   * 48 kHz a 1,5 MHz, com 4 a 8 periodos detectados. Nao e um frame UART.
+   *
+   * 0x33 transmitido a 2 Mbit/s produz transicoes a cada 2 bits, ou seja
+   * ~500 kHz -- no meio da faixa exigida. Cada byte rende ~2 periodos, entao
+   * 8 bytes dao ~16, com folga sobre o minimo.
+   *
+   * Sem isto o transceiver so acorda por acidente: transientes de conectar e
+   * desconectar o cabo iso UART acabam disparando o detector, o que explica
+   * o sistema so subir depois de mexer no cabo. */
+  static const uint8_t wake_pattern[8] =
+  {
+    0x33u, 0x33u, 0x33u, 0x33u, 0x33u, 0x33u, 0x33u, 0x33u
+  };
+
+  s_tp->flush();
+  (void)s_tp->send(wake_pattern, (uint16_t)sizeof(wake_pattern));
+
+  /* t_WAKE: 200 a 500 us da borda de entrada ate a sequencia propagada. */
+  if (s_tp->delay_us != NULL)
+  {
+    s_tp->delay_us(1000u);
+  }
+
+  s_tp->flush();   /* descarta o eco do proprio padrao */
+
+  /* Com o transceiver acordado, uma leitura acorda o sensing IC
+   * (user manual, secao 3.6.2). O resultado nao interessa. */
+  uint16_t scratch = 0u;
   (void)tle9012_read_reg(TLE9012_UNASSIGNED_ID, TLE9012_REG_CONFIG, &scratch);
 
   if (s_tp->delay_us != NULL)
   {
     s_tp->delay_us(1000u);
   }
+}
 
-  (void)tle9012_read_reg(TLE9012_UNASSIGNED_ID, TLE9012_REG_CONFIG, &scratch);
+void tle9012_force_reset(uint8_t node_id)
+{
+  /* Se o IC ja estiver em NODE_ID = 0, ninguem responde neste ID e a escrita
+   * falha -- que e exatamente o caso desejado. Por isso o resultado e
+   * descartado: aqui a falha nao e erro. */
+  (void)tle9012_write_reg(node_id, TLE9012_REG_OP_MODE,
+                          TLE9012_OP_MODE_SLEEP_REG_RESET);
+
+  if (s_tp->delay_us != NULL)
+  {
+    s_tp->delay_us(5000u);   /* manual pede 4 ms; 5 por margem */
+  }
+
+  /* Um comando de leitura acorda o dispositivo (secao 3.6.2, passo 2).
+   * Ele volta em NODE_ID = 0. */
+  uint16_t scratch = 0u;
+  (void)tle9012_read_reg(node_id, TLE9012_REG_CONFIG, &scratch);
+
+  if (s_tp->delay_us != NULL)
+  {
+    s_tp->delay_us(1000u);
+  }
 }
 
 tle9012_status_t tle9012_disable_open_load(uint8_t node_id)

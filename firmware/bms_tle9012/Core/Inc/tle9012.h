@@ -65,6 +65,23 @@ void tle9012_bind(const tle9012_transport_t *transport);
 void tle9012_wakeup(void);
 
 /**
+ * @brief Devolve um IC a NODE_ID = 0, para permitir reinicializar a cadeia.
+ *
+ * Implementa o procedimento da secao 3.6.2 do manual: escreve
+ * SLEEP_REG_RESET no OP_MODE do no indicado, o que reseta todos os
+ * registradores e o poe em sleep; espera; e acorda com um comando de leitura.
+ * O dispositivo volta com NODE_ID = 0 e pode ser endercado de novo.
+ *
+ * @note Resolve o caso em que o TLE9012 mantem o NODE_ID de uma sessao
+ *       anterior: sem isto, tle9012_assign_node_id() escreve no no 0, nao
+ *       encontra ninguem, e a cadeia nunca sobe de novo.
+ *
+ * @note Falhas sao deliberadamente ignoradas. Se o IC ja estiver em
+ *       NODE_ID = 0, nao ha quem responda no ID antigo -- e isso e o caso bom.
+ */
+void tle9012_force_reset(uint8_t node_id);
+
+/**
  * @brief Desativa o diagnostico de open load.
  * @note  Obrigatorio ao usar o ladder resistivo da placa de avaliacao, que
  *        dispara open load falso. Remover ao migrar para celulas reais.

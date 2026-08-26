@@ -120,7 +120,7 @@
   </div>
   <div class="meta">
     Documento T&eacute;cnico<br>
-    Rev. 1.3<br>
+    Rev. 1.4<br>
     2026-08-25
   </div>
 </div>
@@ -163,6 +163,7 @@
     </li>
     <li><a href="#s7">Estrutura de Diret&oacute;rios do Projeto</a></li>
     <li><a href="#s8">Fluxo de Atualiza&ccedil;&atilde;o em Campo</a></li>
+    <li><a href="#s9b">Valida&ccedil;&atilde;o em Bancada</a></li>
     <li><a href="#s9">Refer&ecirc;ncias</a>
       <ol>
         <li><a href="#s9">Uso da Biblioteca de Refer&ecirc;ncia</a></li>
@@ -386,7 +387,7 @@ qualquer uma das duas configura&ccedil;&otilde;es.</p>
   <tr><td>Main</td><td class="id">main.c</td><td>Init de perif&eacute;ricos, loop principal, scheduler</td></tr>
   <tr><td>TLE9012 Driver</td><td class="id">tle9012.c/h</td><td>Comunica&ccedil;&atilde;o iso UART, leitura de c&eacute;lulas e temperaturas, balanceamento</td></tr>
   <tr><td>TLE9015 Driver</td><td class="id">tle9015.c/h</td><td>Init do transceiver, wake-up, sleep</td></tr>
-  <tr><td>CRC</td><td class="id">crc_j1850.c/h</td><td>CRC SAE-J1850 (lookup table) para frames iso UART</td></tr>
+  <tr><td>CRC</td><td class="id">crc_j1850.c/h</td><td>CRC8 SAE-J1850 e CRC3 do reply frame, bit a bit</td></tr>
   <tr><td>Par&acirc;metros</td><td class="id">params.c/h</td><td>Leitura/escrita da tabela de par&acirc;metros na flash</td></tr>
   <tr><td>Prote&ccedil;&otilde;es</td><td class="id">protection.c/h</td><td>L&oacute;gica OV, UV, OT, UT, open-wire &mdash; flags e a&ccedil;&otilde;es</td></tr>
   <tr><td>Balanceamento</td><td class="id">balancing.c/h</td><td>Algoritmo de balanceamento passivo baseado em delta de tens&atilde;o</td></tr>
@@ -579,8 +580,17 @@ deve descartar o eco antes de interpretar a resposta:</p>
 </tbody>
 </table>
 
-<p>O CRC8 &eacute; o SAE-J1850: <code>G(z) = z&sup8; + z&sup4; + z&sup3; + z&sup2; + 1</code>. Implementar por lookup table
-de 256 bytes &mdash; a 2 Mbit/s o or&ccedil;amento de tempo por frame &eacute; apertado.</p>
+<p>O CRC8 &eacute; o SAE-J1850: <code>G(z) = z&sup8; + z&sup4; + z&sup3; + z&sup2; + 1</code>.</p>
+
+<div class="nota">
+  <div class="rot">Corre&ccedil;&atilde;o em rela&ccedil;&atilde;o &agrave;s revis&otilde;es 1.0&ndash;1.3</div>
+  As revis&otilde;es anteriores recomendavam implementar o CRC por <em>lookup table</em> de 256 bytes,
+  alegando aperto de tempo. <strong>A justificativa estava errada.</strong> Um frame tem no maximo
+  5 bytes, ou seja 40 itera&ccedil;&otilde;es &mdash; cerca de 0,3 &micro;s a 170 MHz, contra ~30 &micro;s de
+  dura&ccedil;&atilde;o do proprio frame no fio a 2 Mbit/s. A tabela custaria 256 bytes de flash para
+  economizar 1% do tempo da transa&ccedil;&atilde;o. A implementa&ccedil;&atilde;o adotada e <strong>bit a bit</strong>,
+  que alem de suficiente e mais facil de auditar.
+</div>
 
 <p>O CRC3 opera sobre o &uacute;nico byte de reply, deslocando 5 vezes com realimenta&ccedil;&atilde;o condicional do
 polin&ocirc;mio <code>0xB0</code>; o frame &eacute; considerado v&aacute;lido quando o resultado &eacute; zero.</p>
@@ -790,7 +800,141 @@ bms_tle9012/
 </div>
 
 <!-- ========== 9. REFERENCIAS ========== -->
-<h2 id="s9">9. Refer&ecirc;ncias</h2>
+<h2 id="s9b">9. Valida&ccedil;&atilde;o em Bancada</h2>
+
+<p>A fase 1 foi levantada em bancada em 2026-08-26, com bateria de 12,67 V no ladder
+resistivo da placa de avalia&ccedil;&atilde;o. As 12 c&eacute;lulas leram <strong>1056 mV</strong> cada,
+consistente com 12670/12. Isso validou em hardware, de uma vez: baudrate de 2 Mbit/s,
+ordem MSB-first, formato dos frames, CRC8 e CRC3, atribui&ccedil;&atilde;o de NODE_ID, mapa de
+registradores e a f&oacute;rmula de convers&atilde;o.</p>
+
+<p>As sete armadilhas abaixo custaram tempo real de bancada. Nenhuma delas &eacute; &oacute;bvia na
+documenta&ccedil;&atilde;o, e v&aacute;rias produzem sintomas que apontam para o lugar errado.</p>
+
+<h3>9.1 Alimenta&ccedil;&atilde;o: VS e VIO s&atilde;o trilhos independentes</h3>
+
+<div class="regra">
+  <div class="rot">A armadilha mais cara</div>
+  <code>VS</code> (pino 34) alimenta o n&uacute;cleo do TLE9015. <code>VIO</code> (pino 30) alimenta
+  <strong>exclusivamente a interface UART</strong> e define seus n&iacute;veis l&oacute;gicos. S&atilde;o
+  independentes e <strong>ambos obrigat&oacute;rios</strong>.
+  <p>Com o <code>VIO</code> flutuando, a Figura 4 do datasheet &eacute; expl&iacute;cita:
+  <code>V_VIO &lt; V_VIO_th_UV</code> (2,2 a 2,76 V) &rarr; <em>&ldquo;UART interface is
+  deactivated&rdquo;</em>.</p>
+  <p><strong>Sintoma observado:</strong> o transceiver fica vivo do lado da iso UART e surdo do
+  lado do MCU. O sistema n&atilde;o sobe sozinho ap&oacute;s ciclar a energia do transceiver e s&oacute;
+  volta ao <strong>desplugar e replugar o cabo iso UART</strong> &mdash; porque isso gera transiente
+  no &uacute;nico lado que ainda funciona. Nenhuma corre&ccedil;&atilde;o de firmware resolve, porque o
+  firmware fala justamente pela interface desativada. E o comportamento &eacute;
+  <strong>intermitente</strong>, n&atilde;o morto: pino de alimenta&ccedil;&atilde;o solto flutua perto do
+  limiar por caminhos parasitas.</p>
+</div>
+
+<table>
+<thead>
+  <tr><td>Pino</td><td>Faixa funcional</td><td>Alimentar com</td></tr>
+</thead>
+<tbody>
+  <tr><td class="id">VS (TLE9015)</td><td class="num">4,75 &ndash; 45 V</td><td>Pino <code>5V</code> da Nucleo</td></tr>
+  <tr class="destaque"><td class="id">VIO (TLE9015)</td><td class="num">3 &ndash; 5,5 V</td><td>Pino <code>3V3</code> da Nucleo</td></tr>
+  <tr><td class="id">VS / U12P (TLE9012)</td><td class="num">4,75 &ndash; 60 V</td><td>Fonte isolada no ladder</td></tr>
+</tbody>
+</table>
+
+<p>Alimentar o <code>VIO</code> com 3,3 V tem um b&ocirc;nus: os pinos UART passam a chavear
+exatamente no n&iacute;vel do <code>PC4</code>/<code>PC5</code>, melhor do que deixar o
+<code>VREGOUT</code> interno aliment&aacute;-lo com 3,45 V.</p>
+
+<h3>9.2 A liga&ccedil;&atilde;o transceiver&harr;sensing &eacute; cruzada</h3>
+
+<p>O sinal entra numa CSC por uma interface e sai pela outra, ent&atilde;o lado igual nos dois
+extremos n&atilde;o tem caminho. Com o MCU no <code>UART_LS</code>, a se&ccedil;&atilde;o 5.1 do datasheet
+estabelece que os dados saem por <code>IFH</code> &mdash; o conector <code>HS</code>.</p>
+
+<table>
+<thead>
+  <tr><td>Transceiver</td><td>Sensing</td><td>V&aacute;lido</td></tr>
+</thead>
+<tbody>
+  <tr><td class="id">LS (IFL)</td><td class="id">H P / H N</td><td class="sim">Primary on Top</td></tr>
+  <tr class="destaque"><td class="id">HS (IFH)</td><td class="id">L P / L N</td><td class="sim">Primary on Bottom &mdash; validado</td></tr>
+  <tr><td class="id">LS</td><td class="id">L P / L N</td><td class="nao">sem caminho</td></tr>
+  <tr><td class="id">HS</td><td class="id">H P / H N</td><td class="nao">sem caminho</td></tr>
+</tbody>
+</table>
+
+<h3>9.3 Watchdog derruba o link sem aviso</h3>
+
+<p>O campo <code>WD_CNT</code> do <code>WDOG_CNT</code> (0x3D) decrementa sozinho. Ao chegar em
+<code>0x00</code>, o TLE9012 <strong>entra em sleep e reseta o NODE_ID para 0</strong>. A partir
+da&iacute;, toda transa&ccedil;&atilde;o endere&ccedil;ada ao n&oacute; antigo d&aacute; timeout, sem nenhum outro
+sintoma.</p>
+
+<p>Observado em bancada como: a cadeia sobe, l&ecirc; corretamente por um tempo, e ent&atilde;o
+<code>meas_count</code> congela enquanto <code>meas_fail_count</code> sobe indefinidamente
+&mdash; mesmo com toda a alimenta&ccedil;&atilde;o presente. O firmware recarrega o contador a cada
+ciclo de medi&ccedil;&atilde;o e logo ap&oacute;s atribuir o NODE_ID.</p>
+
+<h3>9.4 Recupera&ccedil;&atilde;o exige reset expl&iacute;cito</h3>
+
+<p><code>tle9012_assign_node_id()</code> escreve no n&oacute; 0, que &eacute; como se endere&ccedil;a um
+IC ainda n&atilde;o configurado. Se o TLE9012 retiver o <code>NODE_ID</code> de uma sess&atilde;o
+anterior, n&atilde;o existe mais ningu&eacute;m no n&oacute; 0 e a reinicializa&ccedil;&atilde;o falha para sempre.</p>
+
+<p>A se&ccedil;&atilde;o 3.6.2 do manual traz o procedimento: escrever <code>SLEEP_REG_RESET</code>
+(<code>OP_MODE</code> = <code>0xC404</code>), aguardar 4 ms e acordar com um comando de leitura.
+O dispositivo volta em <code>NODE_ID = 0</code>.</p>
+
+<h3>9.5 Formato da rajada de multiread</h3>
+
+<p>O manual documenta os registradores <code>MULTI_READ</code> (0x31) e
+<code>MULTI_READ_CFG</code> (0x32), mas <strong>n&atilde;o descreve o frame de resposta</strong>. O
+layout abaixo foi determinado observando a rajada real em bancada:</p>
+
+<div class="arq">
+Total: 64 bytes para 12 celulas
+
+  [0..3]    eco do pedido de leitura (1E ID 31 CRC)
+  [4..8]    frame da celula 11   \
+  [9..13]   frame da celula 10    |  12 frames de 5 bytes:
+  ...                             |  SYNC | ID | DATA_H | DATA_L | CRC8
+  [59..63]  frame da celula 0    /   CRC cobre os 4 bytes anteriores
+</div>
+
+<div class="aviso">
+  <div class="rot">N&atilde;o verificado</div>
+  A <strong>ordem</strong> das c&eacute;lulas segue a descri&ccedil;&atilde;o do campo
+  <code>PCVM_SEL = 0xC</code> no manual, <em>&ldquo;Result of Cell 11-0&rdquo;</em> &mdash; decrescente.
+  Com ladder resistivo todas as c&eacute;lulas leem igual, o que torna ordem certa e invertida
+  <strong>indistinguiveis</strong>. Confirmar com fonte desbalanceada ou c&eacute;lulas reais antes de
+  confiar: &eacute; um erro que s&oacute; se manifesta quando o pack desbalanceia, que &eacute; exatamente
+  quando o BMS precisa acertar.
+</div>
+
+<h3>9.6 Dado obsoleto se passando por atual</h3>
+
+<div class="regra">
+  <div class="rot">Defeito pr&oacute;prio, corrigido</div>
+  A primeira vers&atilde;o do la&ccedil;o de medi&ccedil;&atilde;o retornava no caminho de erro sem tocar no
+  snapshot. Ao desligar a fonte da sensing board, <code>meas_fail_count</code> subia mas
+  <code>cell_mv</code> continuava exibindo 1056 mV indefinidamente.
+  <p>Num BMS esse &eacute; o pior tipo de defeito: agir sobre tens&atilde;o obsoleta acreditando que
+  &eacute; atual. A corre&ccedil;&atilde;o introduziu <code>cell_data_valid</code> e
+  <code>cell_data_age_ms</code>. <strong>Nenhuma camada superior pode usar <code>cell_mv</code>
+  sem conferir <code>cell_data_valid</code> antes</strong> &mdash; e isso vale tamb&eacute;m para o
+  CAN: transmitir leitura de dez minutos atr&aacute;s como se fosse atual &eacute; pior que n&atilde;o
+  transmitir nada.</p>
+</div>
+
+<h3>9.7 Tempo de convers&atilde;o por polling</h3>
+
+<p>O bit <code>PCVM_START</code> (<code>MEAS_CTRL</code> bit 15, tipo <code>rwh</code>) &eacute;
+limpo pelo hardware ao final da convers&atilde;o &mdash; <em>&ldquo;Bit cleared if conversion
+done&rdquo;</em>. Fazer polling desse bit substitui o atraso fixo arbitrado, com dois ganhos: a
+leitura sai assim que fica pronta, e uma convers&atilde;o que n&atilde;o conclui vira erro expl&iacute;cito
+em vez de dado lido cedo demais.</p>
+
+<h2 id="s9">10. Refer&ecirc;ncias</h2>
 <ol class="refs">
   <li>Infineon, <em>TLE9012DQU, TLE9015DQU &mdash; User Manual</em>, Rev. 1.0, Z8F80064984, 2022-01-24.</li>
   <li>STMicroelectronics, <em>STM32G4 Series &mdash; Reference Manual</em>, RM0440 (cobre a linha G491).</li>
@@ -830,9 +974,12 @@ como refer&ecirc;ncia de alto valor em tr&ecirc;s pontos:</p>
 <div class="aviso">
   <div class="rot">Limita&ccedil;&otilde;es conhecidas da refer&ecirc;ncia</div>
   A pr&oacute;pria biblioteca documenta que o comando <em>multiread</em> n&atilde;o est&aacute; implementado nas vers&otilde;es atuais.
-  Como o multiread &eacute; o mecanismo mais eficiente para ler as 12 tens&otilde;es num &uacute;nico ciclo, essa &eacute; uma
-  funcionalidade que precisar&aacute; ser escrita do zero &mdash; ver registradores MULTI_READ (0x24) e
-  MULTI_READ_CFG (0x25) no manual.
+  Como o multiread &eacute; o mecanismo mais eficiente para ler as 12 tens&otilde;es num &uacute;nico ciclo, essa
+  funcionalidade foi escrita do zero &mdash; ver se&ccedil;&atilde;o 10.3.</p>
+  <p><strong>Corre&ccedil;&atilde;o:</strong> as revis&otilde;es 1.0&ndash;1.3 citavam <code>MULTI_READ</code> em 0x24 e
+  <code>MULTI_READ_CFG</code> em 0x25. <strong>Ambos estavam errados</strong> &mdash; 0x24 &eacute; o
+  <code>PCVM_11</code>. Os enderecos corretos, conforme a Tabela 27 do manual, s&atilde;o
+  <strong>0x31</strong> e <strong>0x32</strong>.
 </div>
 
 </main>
