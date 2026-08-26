@@ -39,6 +39,13 @@ typedef struct
   bool (*recv)(uint8_t *buf, uint16_t len, uint32_t timeout_ms);
   void (*flush)(void);
   void (*delay_us)(uint32_t us);
+
+  /** Copia ate @p max_len bytes ja recebidos, devolvendo quantos copiou.
+   *  Usado no caminho de timeout para preservar o que chegou -- tipicamente
+   *  o eco, que e o que diz se o problema e local ou do outro lado do fio.
+   *  Opcional: pode ser NULL. */
+  uint16_t (*drain)(uint8_t *buf, uint16_t max_len);
+
   uint32_t timeout_ms;
 } tle9012_transport_t;
 

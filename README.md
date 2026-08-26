@@ -13,7 +13,7 @@ flash, sem recompilar, e atualização de firmware por **bootloader CAN**.
 
 | Fase | Escopo | Endereço do app | Status |
 |:---:|---|---|---|
-| 1 | Driver TLE9012 — ler as 12 tensões | `0x0800 0000` | 🔨 em bring-up |
+| 1 | Driver TLE9012 — ler as 12 tensões | `0x0800 0000` | ✅ validado em bancada |
 | 2 | Proteções, temperatura, balanceamento | `0x0800 0000` | ⬜ |
 | 3 | Tabela de parâmetros em flash + CAN | `0x0800 0000` | ⬜ |
 | 4 | Bootloader CAN | `0x0800 4000` | ⬜ |
@@ -64,12 +64,25 @@ points e no header COM6 — apesar do nome, **não** exige um AURIX.
 
 | TLE9015 | TLE9012 |
 |---|---|
-| conector `LS`, pino `P` | `CON6` → `H P` |
-| conector `LS`, pino `N` | `CON6` → `H N` |
+| conector **`HS`**, pino `P` | **`L P`** |
+| conector **`HS`**, pino `N` | **`L N`** |
 
-O **low side do transceiver vai no high side do sensing** — nunca LS↔LS. Use o cabo
-par trançado do kit. O conector `L P`/`L N` do sensing fica livre: é a última placa da
-cadeia, e por isso o firmware passa `final_node = true`.
+> **A ligação é sempre cruzada.** O sinal entra numa CSC por uma interface e sai pela
+> outra, então lado igual nos dois extremos não tem caminho:
+>
+> | Transceiver | Sensing | |
+> |---|---|---|
+> | `LS` (IFL) | `H P`/`H N` | ✅ Primary on Top |
+> | `HS` (IFH) | `L P`/`L N` | ✅ Primary on Bottom |
+> | `LS` | `L P`/`L N` | ❌ |
+> | `HS` | `H P`/`H N` | ❌ |
+>
+> Com o MCU no `UART_LS`, a configuração coerente é a **segunda**: a seção 5.1 do
+> datasheet do TLE9015 estabelece que `UART_LS` propaga em `IFH`, ou seja, os dados
+> saem pelo conector `HS`. **Esta é a combinação validada em bancada.**
+
+Use o cabo par trançado do kit, `P` com `P` e `N` com `N`. O conector oposto do sensing
+fica livre: é a última placa da cadeia, e por isso o firmware passa `final_node = true`.
 
 A sensing board é alimentada à parte, com **5 V a 60 V** nos terminais `VS`/`GND` da
 borda esquerda. **Não ligue o GND dela ao GND da Nucleo** — os dois domínios são

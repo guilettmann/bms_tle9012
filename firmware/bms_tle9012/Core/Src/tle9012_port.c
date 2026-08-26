@@ -116,6 +116,24 @@ static bool port_recv(uint8_t *buf, uint16_t len, uint32_t timeout_ms)
   return true;
 }
 
+static uint16_t port_drain(uint8_t *buf, uint16_t max_len)
+{
+  uint16_t n = rx_available();
+
+  if (n > max_len)
+  {
+    n = max_len;
+  }
+
+  for (uint16_t i = 0u; i < n; i++)
+  {
+    buf[i]    = s_rx_ring[s_rx_tail];
+    s_rx_tail = (uint16_t)((s_rx_tail + 1u) & RX_RING_MASK);
+  }
+
+  return n;
+}
+
 static void port_delay_us(uint32_t us)
 {
   const uint32_t start  = DWT->CYCCNT;
@@ -135,6 +153,7 @@ static const tle9012_transport_t s_transport =
   .recv       = port_recv,
   .flush      = port_flush,
   .delay_us   = port_delay_us,
+  .drain      = port_drain,
   .timeout_ms = TP_TIMEOUT_MS
 };
 

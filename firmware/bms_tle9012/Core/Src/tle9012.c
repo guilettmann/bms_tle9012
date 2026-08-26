@@ -101,7 +101,11 @@ tle9012_status_t tle9012_write_reg(uint8_t node_id, uint8_t addr, uint16_t data)
 
   if (!s_tp->recv(rx, RESP_LEN_WRITE, s_tp->timeout_ms))
   {
-    dbg_capture(tx, FRAME_LEN_WRITE, rx, 0u, TLE9012_ERR_TIMEOUT);
+    /* Preserva o parcial: sao esses bytes que dizem se o eco esta integro. */
+    const uint16_t got = (s_tp->drain != NULL)
+                       ? s_tp->drain(rx, RESP_LEN_WRITE) : 0u;
+
+    dbg_capture(tx, FRAME_LEN_WRITE, rx, got, TLE9012_ERR_TIMEOUT);
     return TLE9012_ERR_TIMEOUT;
   }
 
@@ -140,7 +144,11 @@ tle9012_status_t tle9012_read_reg(uint8_t node_id, uint8_t addr, uint16_t *out)
 
   if (!s_tp->recv(rx, RESP_LEN_READ, s_tp->timeout_ms))
   {
-    dbg_capture(tx, FRAME_LEN_READ, rx, 0u, TLE9012_ERR_TIMEOUT);
+    /* Preserva o parcial: sao esses bytes que dizem se o eco esta integro. */
+    const uint16_t got = (s_tp->drain != NULL)
+                       ? s_tp->drain(rx, RESP_LEN_READ) : 0u;
+
+    dbg_capture(tx, FRAME_LEN_READ, rx, got, TLE9012_ERR_TIMEOUT);
     return TLE9012_ERR_TIMEOUT;
   }
 
