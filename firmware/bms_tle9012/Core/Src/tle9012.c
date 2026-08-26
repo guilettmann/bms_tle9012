@@ -319,6 +319,106 @@ tle9012_status_t tle9012_wait_measurement(uint8_t node_id, uint16_t max_polls)
   return TLE9012_ERR_TIMEOUT;
 }
 
+/* --- Temperatura --------------------------------------------------------- */
+
+tle9012_status_t tle9012_config_temp(uint8_t node_id, uint8_t n_sensors,
+                                     uint8_t i_ntc, uint16_t ot_threshold)
+{
+  if ((n_sensors == 0u) || (n_sensors > TLE9012_MAX_TEMP_SENSORS) ||
+      (i_ntc > 3u))
+  {
+    return TLE9012_ERR_PARAM;
+  }
+
+  /* NR_TEMP_SENSE codifica a QUANTIDADE de sensores: 001b = so TMP0,
+   * 101b = TMP0 a TMP4. O codigo e o proprio numero de sensores. */
+  const uint16_t cfg =
+      (uint16_t)(((uint16_t)n_sensors    << TLE9012_TEMP_CONF_NR_SHIFT)
+               | ((uint16_t)i_ntc        << TLE9012_TEMP_CONF_INTC_SHIFT)
+               | (ot_threshold & TLE9012_TEMP_CONF_OT_MASK));
+
+  return tle9012_write_reg(node_id, TLE9012_REG_TEMP_CONF, cfg);
+}
+
+tle9012_status_t tle9012_sync_round_robin(uint8_t node_id)
+{
+  return tle9012_write_reg(node_id, TLE9012_REG_RR_CONFIG,
+                           TLE9012_RR_CONFIG_SYNC_ON);
+}
+
+tle9012_status_t tle9012_read_temp_raw(uint8_t node_id,
+                                       tle9012_temp_raw_t *out, uint8_t n)
+{
+  if ((out == NULL) || (n == 0u) || (n > TLE9012_MAX_TEMP_SENSORS))
+  {
+    return TLE9012_ERR_PARAM;
+  }
+
+  for (uint8_t z = 0u; z < n; z++)
+  {
+    uint16_t reg = 0u;
+    const uint8_t addr = (uint8_t)(TLE9012_REG_EXT_TEMP_0 + z);
+
+    const tle9012_status_t st = tle9012_read_reg(node_id, addr, &reg);
+
+    if (st != TLE9012_OK)
+    {
+      return st;
+    }
+
+    out[z].result = (uint16_t)(reg & TLE9012_TEMP_RESULT_MASK);
+    out[z].intc   = (uint8_t)((reg >> TLE9012_TEMP_INTC_SHIFT)
+                              & TLE9012_TEMP_INTC_MASK);
+    out[z].valid  = ((reg & TLE9012_TEMP_VALID_BIT) != 0u);
+    out[z].pd_err = ((reg & TLE9012_TEMP_PD_ERR_BIT) != 0u);
+  }
+
+  return TLE9012_OK;
+}
+
+uint32_t tle9012_temp_raw_to_ohms(const tle9012_temp_raw_t *t,
+                                  uint16_t r_series_ohm)
+{
+  if (t == NULL)
+  {
+    return 0u;
+  }
+
+  /* FSR_TMP = 2 V, corrente base 320 uA, resolucao 10 bits. O fator
+   * 2 / (2^10 x 320e-6) = 6,103515625 e exatamente 25000/4096, o que permite
+   * fazer a conta so com inteiros e um deslocamento.
+   *
+   * Pior caso: 1023 x 64 x 25000 = 1,64e9 -- cabe em uint32. */
+  const uint32_t gain  = 1uL << (2u * t->intc);          /* 4^INTC */
+  const uint32_t scaled = ((uint32_t)t->result * gain * 25000uL) >> 12;
+
+  return (scaled > (uint32_t)r_series_ohm)
+       ? (scaled - (uint32_t)r_series_ohm)
+       : 0u;
+}
+
+uint32_t tle9012_compensate_parallel(uint32_t r_measured, uint32_t r_parallel)
+{
+  if (r_parallel == 0u)
+  {
+    return r_measured;   /* compensacao desativada */
+  }
+
+  /* R_medido nunca pode alcancar R_paralelo: o paralelo de qualquer coisa com
+   * R_paralelo e sempre menor que ele. Se alcancou, a medicao esta ruim ou o
+   * valor de R_paralelo esta errado -- devolver 0 sinaliza isso em vez de
+   * produzir um numero enorme e sem sentido. */
+  if (r_measured >= r_parallel)
+  {
+    return 0u;
+  }
+
+  const uint64_t num = (uint64_t)r_measured * (uint64_t)r_parallel;
+  const uint64_t den = (uint64_t)(r_parallel - r_measured);
+
+  return (uint32_t)(num / den);
+}
+
 /* --- Multiread ----------------------------------------------------------- */
 
 volatile uint8_t  tle_mr_raw[TLE9012_MULTIREAD_MAX_BYTES];

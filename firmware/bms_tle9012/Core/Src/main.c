@@ -24,6 +24,8 @@
 #include "tle9012.h"
 #include "tle9012_port.h"
 #include "tle9012_regs.h"
+
+#include <math.h>   /* logf, apenas na conversao NTC para graus */
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -41,6 +43,43 @@
  * ciclos = 300 ms sem leitura valida, tempo de sobra para distinguir um
  * glitch pontual de um link que caiu. */
 #define BMS_MAX_CONSEC_FAIL 3u
+
+/* --- Temperatura --------------------------------------------------------- */
+
+#define BMS_NUM_TEMP        5u    /* TMP0 a TMP4                              */
+#define BMS_TEMP_INTC       1u    /* fonte de corrente ITMPz_1                */
+#define BMS_TEMP_OT_THR     0u    /* 0 desativa a deteccao de sobretemperatura */
+
+/* Le temperatura a cada 10 ciclos de tensao (1 s). O round robin faz no
+ * maximo duas medicoes de temperatura por ciclo, entao nao adianta ler mais
+ * rapido -- e temperatura de celula nao muda em 100 ms. */
+#define BMS_TEMP_EVERY_N    10u
+
+/* Resistor de referencia em serie com os NTCs (R_TMP no esquematico).
+ * O manual usa 100 ohm no exemplo da secao 3.4.2. CONFERIR NA PLACA. */
+#define BMS_TEMP_R_SERIES   100u
+
+/* Resistencia populada na placa em paralelo com o NTC externo (posicoes
+ * NTC0..NTC4 da Figura 18). Medida em bancada: ~5,2 kohm nos cinco canais.
+ * Zero desativa a compensacao.
+ *
+ * Isto e um PALIATIVO. Dessoldar o componente da placa da leitura limpa; a
+ * compensacao amplifica erro em temperaturas baixas, onde R_medido se
+ * aproxima deste valor. */
+#define BMS_TEMP_R_PARALLEL 5197u
+
+/* Parametros do NTC (MF52A), usados APENAS na conversao para graus, que serve
+ * para conferencia visual. As protecoes comparam em ohms e nao dependem disto.
+ *
+ * MF52A e nome de familia, nao de valor: existem variantes de 1k a 100k e
+ * varios B. A mais comum e 10 kohm com B = 3950 -- e o que esta aqui.
+ * CONFERIR no encapsulamento ou medindo com multimetro a temperatura conhecida.
+ *
+ * B errado nao desloca a leitura a 25 C (os dois ancoram em R25), mas afasta
+ * progressivamente conforme sai dessa temperatura -- justamente na faixa em
+ * que um pack opera. Vira parametro da tabela em flash na fase 3. */
+#define BMS_NTC_R25_OHM     10000.0f
+#define BMS_NTC_BETA        3950.0f
 
 /* Tentativas de polling do PCVM_START antes de desistir da conversao. Cada
  * tentativa custa uma leitura (~50 us) mais 100 us de espera, entao 100
@@ -95,6 +134,17 @@ volatile uint32_t smoke_attempts;
  * problema de link. Ver secao 4.11 do manual para os bits. */
 volatile uint16_t gen_diag;
 volatile uint8_t  gen_diag_status;
+
+/* Temperatura. temp_ohms e o dado exato, em inteiro -- e o que as protecoes
+ * devem usar. temp_c e conversao em float apenas para leitura humana no
+ * depurador, e depende dos parametros do NTC estarem corretos. */
+volatile uint32_t temp_ohms_raw[BMS_NUM_TEMP];  /* o que o ADC ve (paralelo) */
+volatile uint32_t temp_ohms[BMS_NUM_TEMP];      /* NTC isolado, compensado   */
+volatile float    temp_c[BMS_NUM_TEMP];
+volatile uint8_t  temp_valid[BMS_NUM_TEMP];
+volatile uint32_t temp_count;
+volatile uint32_t temp_fail_count;
+volatile uint8_t  temp_status;
 
 /* USER CODE END PV */
 
@@ -219,6 +269,18 @@ static bool bms_chain_init(void)
     return false;
   }
 
+  if (tle9012_config_temp(BMS_NODE_ID, BMS_NUM_TEMP,
+                          BMS_TEMP_INTC, BMS_TEMP_OT_THR) != TLE9012_OK)
+  {
+    return false;
+  }
+
+  /* Amarra o round robin ao kick do watchdog, que ja roda a cada ciclo. */
+  if (tle9012_sync_round_robin(BMS_NODE_ID) != TLE9012_OK)
+  {
+    return false;
+  }
+
   /* Confirma lendo de volta -- o manual recomenda validar toda escrita de
    * configuracao relendo o registrador (secao 3.1.2). */
   uint16_t readback = 0u;
@@ -304,6 +366,76 @@ static void bms_measure_cycle(void)
   cell_data_age_ms = 0u;
   cell_data_valid  = 1u;
   meas_count++;
+}
+
+/**
+ * @brief Le os NTCs externos e converte para resistencia.
+ *
+ * Nao afeta chain_ready: falha de temperatura nao derruba a cadeia, so
+ * invalida os canais. A tensao continua sendo o dado critico.
+ */
+static void bms_temp_cycle(void)
+{
+  tle9012_temp_raw_t raw[BMS_NUM_TEMP];
+
+  const tle9012_status_t st = tle9012_read_temp_raw(BMS_NODE_ID, raw,
+                                                    BMS_NUM_TEMP);
+  temp_status = (uint8_t)st;
+
+  if (st != TLE9012_OK)
+  {
+    temp_fail_count++;
+
+    for (uint8_t z = 0u; z < BMS_NUM_TEMP; z++)
+    {
+      temp_valid[z] = 0u;
+    }
+
+    return;
+  }
+
+  for (uint8_t z = 0u; z < BMS_NUM_TEMP; z++)
+  {
+    /* O bit VALID e limpo ao ler: se estiver zero, o round robin ainda nao
+     * produziu resultado novo para este canal desde a leitura anterior. */
+    if (!raw[z].valid)
+    {
+      temp_valid[z] = 0u;
+      continue;
+    }
+
+    const uint32_t measured = tle9012_temp_raw_to_ohms(&raw[z],
+                                                       BMS_TEMP_R_SERIES);
+
+    /* O que o ADC ve: NTC externo em paralelo com o componente da placa. */
+    temp_ohms_raw[z] = measured;
+
+    const uint32_t ohms = tle9012_compensate_parallel(measured,
+                                                      BMS_TEMP_R_PARALLEL);
+
+    if (ohms == 0u)
+    {
+      /* Compensacao impossivel: sem NTC externo, ou R_PARALLEL errado. */
+      temp_valid[z] = 0u;
+      continue;
+    }
+
+    temp_ohms[z]  = ohms;
+    temp_valid[z] = 1u;
+
+    /* Equacao de Beta, so para leitura humana. Protecao deve comparar em
+     * ohms, sem passar por logaritmo. */
+    if (ohms > 0u)
+    {
+      const float t_kelvin =
+          1.0f / ((1.0f / 298.15f)
+                  + (logf((float)ohms / BMS_NTC_R25_OHM) / BMS_NTC_BETA));
+
+      temp_c[z] = t_kelvin - 273.15f;
+    }
+  }
+
+  temp_count++;
 }
 
 /**
@@ -412,6 +544,12 @@ int main(void)
     }
 
     bms_measure_cycle();
+
+    /* Temperatura em cadencia mais lenta que a tensao. */
+    if ((meas_count % BMS_TEMP_EVERY_N) == 0u)
+    {
+      bms_temp_cycle();
+    }
 
     BSP_LED_Toggle(LED_GREEN);
     HAL_Delay(BMS_MEAS_PERIOD_MS);

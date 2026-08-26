@@ -69,6 +69,35 @@
  */
 #define TLE9012_MULTIREAD_CFG_ALL_CELLS  0x000Cu
 
+/* --- Temperatura --------------------------------------------------------- */
+
+/** TEMP_CONF.NR_TEMP_SENSE, bits 14:12 (secao 4.6). 101b = TMP0 a TMP4. */
+#define TLE9012_TEMP_CONF_NR_SHIFT    12u
+#define TLE9012_TEMP_CONF_NR_ALL5     5u
+
+/** TEMP_CONF.I_NTC, bits 11:10 -- fonte de corrente usada na medicao. */
+#define TLE9012_TEMP_CONF_INTC_SHIFT  10u
+
+/** TEMP_CONF.EXT_OT_THR, bits 9:0. Sobretemperatura e detectada quando o
+ *  resultado fica ABAIXO do limiar, porque a resistencia do NTC CAI com o
+ *  aumento de temperatura. Zero desativa. */
+#define TLE9012_TEMP_CONF_OT_MASK     0x03FFu
+
+/* Campos do EXT_TEMP_z (secao 4.29). */
+#define TLE9012_TEMP_RESULT_MASK      0x03FFu  /* bits 9:0                    */
+#define TLE9012_TEMP_INTC_SHIFT       10u      /* bits 11:10                  */
+#define TLE9012_TEMP_INTC_MASK        0x0003u
+#define TLE9012_TEMP_PULLDOWN_BIT     0x1000u  /* bit 12                      */
+#define TLE9012_TEMP_VALID_BIT        0x2000u  /* bit 13, limpo ao ler        */
+#define TLE9012_TEMP_PD_ERR_BIT       0x4000u  /* bit 14                      */
+
+/**
+ * RR_CONFIG com RR_SYNC = 1 (bit 7), preservando o restante do valor de reset
+ * (0x8024). Faz o round robin disparar a cada escrita no WD_CNT -- ou seja, o
+ * proprio kick do watchdog passa a agendar a medicao de temperatura.
+ */
+#define TLE9012_RR_CONFIG_SYNC_ON     0x80A4u
+
 /** Bit FN (Final Node) no campo de dados do CONFIG. Tabela 10: 0x0804 = FN + ID 4. */
 #define TLE9012_CONFIG_FINAL_NODE     0x0800u
 

@@ -128,6 +128,82 @@ tle9012_status_t tle9012_start_measurement(uint8_t node_id);
  */
 tle9012_status_t tle9012_wait_measurement(uint8_t node_id, uint16_t max_polls);
 
+/* --- Temperatura --------------------------------------------------------- */
+
+#define TLE9012_MAX_TEMP_SENSORS 5u
+
+/** Conteudo bruto de um registrador EXT_TEMP_z, ja decomposto. */
+typedef struct
+{
+  uint16_t result;   /**< RESULT, bits 9:0 -- saida do SD-ADC               */
+  uint8_t  intc;     /**< INTC, bits 11:10 -- fonte de corrente usada       */
+  bool     valid;    /**< VALID, bit 13 -- resultado novo desde a ultima leitura */
+  bool     pd_err;   /**< PD_ERR, bit 14 -- erro de pull-down               */
+} tle9012_temp_raw_t;
+
+/**
+ * @brief Configura a medicao de temperatura externa.
+ * @param n_sensors     quantos NTCs ativar, de 1 a 5 (TMP0 em diante).
+ * @param i_ntc         fonte de corrente, 0 a 3 (ITMPz_0 a ITMPz_3).
+ * @param ot_threshold  limiar de sobretemperatura, 10 bits. Zero desativa.
+ *
+ * @note A sobretemperatura dispara quando o resultado fica ABAIXO do limiar,
+ *       porque a resistencia do NTC cai conforme a temperatura sobe.
+ */
+tle9012_status_t tle9012_config_temp(uint8_t node_id, uint8_t n_sensors,
+                                     uint8_t i_ntc, uint16_t ot_threshold);
+
+/**
+ * @brief Amarra o round robin ao watchdog (RR_SYNC = 1).
+ *
+ * A temperatura nao e disparada como a tensao: ela e medida pelo round robin,
+ * ate duas por ciclo (secao 3.2.4). Com RR_SYNC ligado, cada escrita no
+ * WD_CNT reinicia o round robin -- ou seja, o kick do watchdog que ja
+ * acontece a cada ciclo passa a agendar tambem a medicao de temperatura.
+ */
+tle9012_status_t tle9012_sync_round_robin(uint8_t node_id);
+
+/** Le os registradores EXT_TEMP_0..z e decompoe os campos. */
+tle9012_status_t tle9012_read_temp_raw(uint8_t node_id,
+                                       tle9012_temp_raw_t *out, uint8_t n);
+
+/**
+ * @brief Converte o resultado bruto em resistencia do NTC, em ohms.
+ *
+ * Formula da secao 3.4.2 do manual:
+ *   R_NTC = RESULT x FSR_TMP x 4^INTC / (2^10 x 320 uA) - R_TMP
+ *
+ * @param r_series_ohm  resistor de referencia em serie (R_TMP).
+ *
+ * @note Aritmetica inteira exata, sem float. Para protecao, comparar NESTE
+ *       dominio -- converter o limiar de temperatura para ohms uma vez e
+ *       comparar resistencias e mais barato e mais previsivel do que
+ *       converter cada leitura para graus.
+ */
+uint32_t tle9012_temp_raw_to_ohms(const tle9012_temp_raw_t *t,
+                                  uint16_t r_series_ohm);
+
+/**
+ * @brief Remove o efeito de uma resistencia em paralelo com o NTC.
+ *
+ * A placa de avaliacao tem componentes populados nas posicoes NTC0..NTC4
+ * (vis&iacute;veis no contorno da PCB na Figura 18 do manual). Um NTC externo fica
+ * em PARALELO com eles, e a leitura resultante nao e a do sensor.
+ *
+ *   R_ntc = (R_medido x R_paralelo) / (R_paralelo - R_medido)
+ *
+ * @param r_parallel  resistencia do componente da placa. Zero desativa.
+ * @return resistencia do NTC isolado, ou 0 se a conta for imposs&iacute;vel.
+ *
+ * @warning Só vale se o componente em paralelo for um resistor FIXO. Se for
+ *          um NTC, ele varia com a temperatura e a compensacao fica errada.
+ * @warning O erro e amplificado quando R_medido se aproxima de R_paralelo,
+ *          ou seja em temperaturas BAIXAS (NTC de resistencia alta). Perto
+ *          desse limite, ruido de poucos ohms vira dezenas de por cento.
+ *          Dessoldar o componente da placa e sempre melhor que compensar.
+ */
+uint32_t tle9012_compensate_parallel(uint32_t r_measured, uint32_t r_parallel);
+
 /* --- Multiread ----------------------------------------------------------- */
 
 /* 96 porque a primeira sonda saturou em 48. Hipoteses para o tamanho real:
