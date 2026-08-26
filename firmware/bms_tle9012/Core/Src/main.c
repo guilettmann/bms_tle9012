@@ -179,6 +179,11 @@ typedef enum
  * dispersao entre celulas para a falha pegar todas de uma vez. */
 #define BMS_SIM_MARGIN_MV   200u
 
+/* Margem da injecao de sobretemperatura, em contagens de RESULT. 50 contagens
+ * equivalem a uns 7 C na faixa de operacao -- o bastante para disparar com
+ * folga e ainda mostrar um limiar plausivel em graus. */
+#define BMS_SIM_OT_MARGIN   50u
+
 /* --- Temperatura --------------------------------------------------------- */
 
 #define BMS_NUM_TEMP        5u    /* tamanho dos vetores: maximo do CI        */
@@ -239,6 +244,22 @@ typedef enum
  * DEPENDE tambem de B = 3950, ainda nao confirmado no componente.
  */
 #define BMS_TEMP_OT_THR     292u
+
+/**
+ * Limiar de RETORNO da sobretemperatura, com 5 C de histerese.
+ *
+ * 327 = 55 C. Como o NTC tem coeficiente negativo, esfriar AUMENTA o RESULT:
+ * a falha seta quando RESULT cai abaixo de 292 e so sai quando sobe acima
+ * de 327 -- uma margem de 35 contagens.
+ *
+ * A deteccao acontece no hardware, mas o flag e latching (rocw), entao QUANDO
+ * limpar e decisao do firmware -- mesma logica da histerese de tensao. Sem
+ * ela, um NTC parado em 60 C faria a falha piscar continuamente.
+ *
+ * Referencia:  45 C = 404 | 50 C = 364 | 55 C = 327
+ *              60 C = 292 | 65 C = 260 | 70 C = 232
+ */
+#define BMS_TEMP_OT_CLEAR   327u
 
 /* Le temperatura a cada 10 ciclos de tensao (1 s). O round robin faz no
  * maximo duas medicoes de temperatura por ciclo, entao nao adianta ler mais
@@ -393,6 +414,11 @@ typedef struct
   uint16_t uv;                  /**< bit i = celula i em subtensao           */
   uint16_t ov;
   uint8_t  ut;                  /**< bit z = canal z frio demais (firmware)  */
+  uint8_t  ot;                  /**< bit z = canal z quente demais           */
+
+  /* Diagnostico do fio do NTC, do EXT_TEMP_DIAG (0x0E). */
+  uint8_t  temp_open;           /**< bit z = fio aberto no canal z           */
+  uint8_t  temp_short;          /**< bit z = curto no canal z                */
 
   /* --- Cru do CI, latching --- */
   uint16_t gen_diag;
@@ -405,6 +431,15 @@ typedef struct
   uint16_t hyst_mv;
   uint32_t ut_thr_ohm;
   uint8_t  ut_enabled;          /**< 0 = protecao de frio desligada          */
+  uint16_t ot_thr;              /**< dispara: RESULT abaixo disto            */
+  uint16_t ot_clear_thr;        /**< retorna: RESULT acima disto (5 C acima) */
+
+  /* Os mesmos limiares em graus, para leitura humana. Recalculados a cada
+   * ciclo a partir dos valores brutos em vigor -- entao acompanham a injecao
+   * de falha, que e justamente o que se quer mostrar numa demonstracao. */
+  float    ot_thr_c;
+  float    ot_clear_c;
+  float    ut_thr_c;
 
   /* --- Historico --- */
   uint16_t latched;             /**< acumula desde o ultimo clear            */
@@ -430,7 +465,9 @@ typedef struct
                          .ov_thr_mv  = BMS_OV_THR_MV,   \
                          .hyst_mv    = BMS_FAULT_HYST_MV, \
                          .ut_thr_ohm = BMS_UT_THR_OHM,  \
-                         .ut_enabled = 0u }
+                         .ut_enabled = 0u,              \
+                         .ot_thr       = BMS_TEMP_OT_THR, \
+                         .ot_clear_thr = BMS_TEMP_OT_CLEAR }
 
 /**
  * Estado do shutdown circuit.
@@ -648,6 +685,9 @@ static bool bms_chain_init(void)
   fault.uv      = 0u;
   fault.ov      = 0u;
   fault.ut      = 0u;
+  fault.ot      = 0u;
+  fault.temp_open  = 0u;
+  fault.temp_short = 0u;
 
   /* Confirma lendo de volta -- o manual recomenda validar toda escrita de
    * configuracao relendo o registrador (secao 3.1.2). */
@@ -736,6 +776,49 @@ static void bms_measure_cycle(void)
   meas.count++;
 }
 
+/**
+ * @brief Converte resistencia de NTC em graus Celsius (equacao de Beta).
+ * @return -999.0f se o valor nao fizer sentido.
+ *
+ * Apenas para leitura humana: as protecoes comparam em ohms e em RESULT.
+ */
+static float ohms_to_celsius(uint32_t ohms)
+{
+  if (ohms == 0u)
+  {
+    return -999.0f;
+  }
+
+  const float t = 1.0f / ((1.0f / 298.15f)
+                          + (logf((float)ohms / BMS_NTC_R25_OHM) / BMS_NTC_BETA));
+
+  return t - 273.15f;
+}
+
+/**
+ * @brief Converte um codigo RESULT do ADC de temperatura em graus.
+ *
+ * Desfaz toda a cadeia: RESULT -> resistencia medida -> remove o paralelo da
+ * placa -> equacao de Beta. Usado para exibir os limiares de sobretemperatura
+ * em graus, ja que o hardware os expressa em contagens de ADC.
+ */
+static float result_to_celsius(uint32_t result, uint8_t intc)
+{
+  const uint32_t gain   = 1uL << (2u * intc);
+  const uint32_t scaled = (result * gain * 25000uL) >> 12;
+
+  if (scaled <= BMS_TEMP_R_SERIES)
+  {
+    return -999.0f;
+  }
+
+  const uint32_t measured = scaled - BMS_TEMP_R_SERIES;
+  const uint32_t ohms = tle9012_compensate_parallel(measured,
+                                                    BMS_TEMP_R_PARALLEL);
+
+  return ohms_to_celsius(ohms);
+}
+
 /** Indice do bit menos significativo setado, ou 0xFF se a mascara for zero. */
 static uint8_t first_bit(uint16_t mask)
 {
@@ -796,7 +879,22 @@ static void bms_resolve_fault_code(void)
     return;
   }
 
-  if ((d & TLE9012_DIAG_EXT_T_ERR) != 0u) { fault.code = BMS_FAULT_EXT_OVERTEMP; return; }
+  /* Usa a mascara com histerese, nao o bit-resumo do GEN_DIAG: e ela que
+   * define quando a sobretemperatura realmente sai. */
+  if (fault.ot != 0u)
+  {
+    fault.cell       = first_bit((uint16_t)fault.ot);
+    fault.cell_count = count_bits((uint16_t)fault.ot);
+    fault.code       = BMS_FAULT_EXT_OVERTEMP;
+    return;
+  }
+
+  if ((fault.temp_open != 0u) || (fault.temp_short != 0u))
+  {
+    fault.cell = first_bit((uint16_t)(fault.temp_open | fault.temp_short));
+    fault.code = BMS_FAULT_OPEN_LOAD;
+    return;
+  }
   if ((d & TLE9012_DIAG_INT_OT) != 0u)    { fault.code = BMS_FAULT_INT_OVERTEMP; return; }
 
   if (fault.ut != 0u)
@@ -838,6 +936,9 @@ static bool bms_any_fault(void)
   if (fault.uv != 0u)     { return true; }
   if (fault.ov != 0u)     { return true; }
   if (fault.ut != 0u)         { return true; }  /* subtemperatura, firmware */
+  if (fault.ot != 0u)         { return true; }  /* sobretemperatura         */
+  if (fault.temp_open != 0u)  { return true; }
+  if (fault.temp_short != 0u) { return true; }
 
   return ((fault.gen_diag & TLE9012_DIAG_FAULT_MASK) != 0u);
 }
@@ -881,11 +982,35 @@ static void bms_apply_simulation(bms_sim_fault_t which)
       break;
 
     case BMS_SIM_OVERTEMP:
-      /* OT dispara quando o resultado fica ABAIXO do limiar, porque a
-       * resistencia do NTC cai com o calor. Limiar no maximo faz qualquer
-       * leitura disparar. */
-      st = tle9012_config_temp(BMS_NODE_ID, BMS_NUM_TEMP_USED, BMS_TEMP_INTC,
-                               TLE9012_TEMP_CONF_OT_MASK);
+      /* Move o limiar para logo ACIMA do RESULT medido -- o que em graus
+       * significa logo ABAIXO da temperatura atual, ja que RESULT maior
+       * corresponde a mais frio.
+       *
+       * Deslocar em vez de saturar no maximo e proposital: o limiar
+       * continua sendo um numero plausivel em graus, entao o depurador
+       * mostra "limiar 20 C, medindo 24 C, disparou" -- que se explica
+       * sozinho. Saturado em 1023 apareceria como -30 C e nao comunicaria
+       * nada a quem esta olhando.
+       */
+      if ((temp.valid[0] != 0u) && (temp.result[0] > 0u))
+      {
+        uint32_t thr = (uint32_t)temp.result[0] + BMS_SIM_OT_MARGIN;
+
+        if (thr > TLE9012_TEMP_CONF_OT_MASK)
+        {
+          thr = TLE9012_TEMP_CONF_OT_MASK;
+        }
+
+        fault.ot_thr       = (uint16_t)thr;
+        fault.ot_clear_thr = (uint16_t)(thr + BMS_SIM_OT_MARGIN);
+
+        st = tle9012_config_temp(BMS_NODE_ID, BMS_NUM_TEMP_USED,
+                                 BMS_TEMP_INTC, (uint16_t)thr);
+      }
+      else
+      {
+        st = TLE9012_ERR_PARAM;   /* sem leitura valida para injetar */
+      }
       break;
 
     case BMS_SIM_OPEN_LOAD:
@@ -943,7 +1068,12 @@ static void bms_apply_simulation(bms_sim_fault_t which)
       }
       fault.ut_thr_ohm   = BMS_UT_THR_OHM;   /* desfaz injecao de subtemperatura */
       fault.ut_enabled   = 0u;               /* volta desligada: sem termistor   */
+      fault.ot_thr       = BMS_TEMP_OT_THR;  /* desfaz injecao de sobretemp.     */
+      fault.ot_clear_thr = BMS_TEMP_OT_CLEAR;
       fault.ut     = 0u;
+      fault.ot     = 0u;
+      fault.temp_open  = 0u;
+      fault.temp_short = 0u;
       fault.uv = 0u;               /* sai do estado latcheado          */
       fault.ov = 0u;
       break;
@@ -1179,6 +1309,29 @@ static void bms_temp_cycle(void)
         == TLE9012_OK)
     {
       temp.ext_diag = v;
+
+      /* Layout do EXT_TEMP_DIAG: tres bits por canal, na ordem
+       * OPEN, SHORT, OT -- canal z ocupa os bits 3z, 3z+1 e 3z+2. */
+      uint8_t ot_now = 0u;
+      uint8_t op_now = 0u;
+      uint8_t sh_now = 0u;
+
+      for (uint8_t z = 0u; z < BMS_NUM_TEMP_USED; z++)
+      {
+        const uint8_t base = (uint8_t)(3u * z);
+
+        if ((v & (uint16_t)(1u << base))        != 0u) { op_now |= (uint8_t)(1u << z); }
+        if ((v & (uint16_t)(1u << (base + 1u))) != 0u) { sh_now |= (uint8_t)(1u << z); }
+        if ((v & (uint16_t)(1u << (base + 2u))) != 0u) { ot_now |= (uint8_t)(1u << z); }
+      }
+
+      /* Aberto e curto nao tem histerese: sao falha de fiacao, nao grandeza
+       * analogica oscilando em torno de um limiar. */
+      fault.temp_open  = op_now;
+      fault.temp_short = sh_now;
+
+      /* Sobretemperatura seta na hora e so sai com margem. */
+      fault.ot |= ot_now;
     }
   }
 
@@ -1190,6 +1343,25 @@ static void bms_temp_cycle(void)
     temp.reg[z]    = raw[z].reg;
     temp.result[z] = raw[z].result;
     temp.intc[z]   = raw[z].intc;
+
+    /* Histerese da sobretemperatura. RESULT maior significa mais frio, entao
+     * a falha so sai quando ele SOBE acima do limiar de retorno.
+     *
+     * Feito aqui, e nao ao ler o EXT_TEMP_DIAG, porque depende do RESULT
+     * deste canal -- e o EXT_TEMP_DIAG so diz que passou, nao quanto. */
+    if (((fault.ot & (uint8_t)(1u << z)) != 0u) &&
+        (raw[z].valid) &&
+        (raw[z].result > fault.ot_clear_thr))
+    {
+      fault.ot &= (uint8_t)~(1u << z);
+
+      /* Limpa tambem no CI: o flag e latching (rocw), e sem limpar ele
+       * reaparece na proxima leitura e a histerese nao teria efeito.
+       * '0' na posicao limpa, '1' preserva as demais. */
+      const uint16_t ot_bit = (uint16_t)(1u << ((3u * z) + 2u));
+      (void)tle9012_write_reg(BMS_NODE_ID, TLE9012_REG_EXT_TEMP_DIAG,
+                              (uint16_t)~ot_bit);
+    }
 
     /* O bit VALID e limpo ao ler: se estiver zero, o round robin ainda nao
      * produziu resultado novo para este canal desde a leitura anterior. */
@@ -1252,6 +1424,17 @@ static void bms_temp_cycle(void)
 
       temp.celsius[z] = t_kelvin - 273.15f;
     }
+  }
+
+  /* Espelha os limiares em graus, usando a fonte de corrente realmente em
+   * uso. Fica ao lado da medicao no depurador, o que e o que torna a
+   * demonstracao legivel: limiar e leitura na mesma unidade. */
+  {
+    const uint8_t intc = temp.intc[0];
+
+    fault.ot_thr_c   = result_to_celsius(fault.ot_thr, intc);
+    fault.ot_clear_c = result_to_celsius(fault.ot_clear_thr, intc);
+    fault.ut_thr_c   = ohms_to_celsius(fault.ut_thr_ohm);
   }
 
   temp.count++;
@@ -1390,6 +1573,9 @@ int main(void)
         fault.uv      = 0u;
         fault.ov      = 0u;
         fault.ut      = 0u;
+        fault.ot      = 0u;
+        fault.temp_open  = 0u;
+        fault.temp_short = 0u;
       }
     }
 
