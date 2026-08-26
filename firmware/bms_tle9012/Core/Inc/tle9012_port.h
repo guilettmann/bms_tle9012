@@ -23,16 +23,20 @@ void tle9012_port_init(UART_HandleTypeDef *huart);
 const tle9012_transport_t *tle9012_port_transport(void);
 
 /**
- * @brief Acorda o transceiver TLE9015 levando nSLEEP a nivel alto.
+ * @brief Impede que o TLE9015 entre em sleep, mantendo nSleep em nivel alto.
  *
- * O transceiver e acordado por hardware, nao por comando -- diferente do
- * TLE9012, que acorda com um comando de leitura. Chamar antes de qualquer
- * tentativa de comunicacao.
+ * ATENCAO ao sentido: nSleep **manda dormir**, nao acorda. O datasheet do
+ * TLE9015DQU (pino 14, secao 4.1) descreve o pino como entrada ativa em baixo,
+ * disparada por **borda de descida**, com **pull-up interno**. Portanto:
  *
- * @note Se o nSLEEP da placa de avaliacao ja estiver amarrado em nivel alto
- *       por jumper ou pull-up, esta chamada e inofensiva.
+ *   - O chip liga acordado; nao existe "acordar por hardware" no power-up.
+ *   - Com o pull-up interno, deixar o pino solto ja o mantem alto.
+ *   - Esta funcao apenas fixa o nivel de forma deterministica e deixa o
+ *     caminho aberto para comandar sleep no futuro (levando o pino a baixo).
+ *
+ * @note Opcional no bring-up. Se o pino nao estiver fiado, nao chame.
  */
-void tle9012_port_wake_transceiver(void);
+void tle9012_port_inhibit_sleep(void);
 
 /**
  * @brief Rearma a recepcao apos erro de linha (overrun, framing, noise).

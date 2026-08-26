@@ -36,17 +36,44 @@ points e no header COM6 — apesar do nome, **não** exige um AURIX.
 
 ### Ligação
 
+**Nucleo → transceiver (TLE9015):**
+
 | Adapter board | NUCLEO-G491RE | Função |
 |---|---|---|
-| `UART_LS` (LS_TX / LS_RX) | `PC4` (USART1_TX) / `PC5` (USART1_RX) | iso UART low-side |
-| `nSLEEP` | GPIO livre | Wake-up do transceiver |
-| `ERRQ` | GPIO (EXTI) | Sinalização de erro |
-| `3.3V` / `GND` | `3V3` / `GND` | Referência comum (lado de baixa tensão) |
+| `TXD_LS` | `PC4` (USART1_TX) | Lado do host, antes do `R_UART` |
+| `UART_LS` | `PC5` (USART1_RX) | Nó compartilhado, ligado ao pino do chip |
+| `VS` (test point `VS1`) | `5V` | **Alimentação — faixa 4,75 V a 45 V** |
+| `VIO` | `3V3` | Define o nível lógico (faixa 3 V a 5,5 V) |
+| `GND` | `GND` | Referência comum |
+| `nSleep` | `PB0` | Opcional — ver nota abaixo |
 
-> **Atenção:** o `UART_LS` do TLE9015 é um pino único — TX e RX do host se unem
-> através de `R_UART` (1 k–1,5 kΩ). Confirme no esquemático se o resistor já está
-> na placa; se não estiver, ele precisa ser adicionado, senão o RX não enxerga nem
-> o próprio eco.
+> **`VS` não funciona com 3,3 V.** O mínimo funcional é 4,75 V (datasheet TLE9015DQU,
+> Tabela 2). Use o pino `5V` da Nucleo — o consumo é ~5 mA em idle e ~15 mA durante
+> comunicação. Alimentar só com 3V3 deixa o chip morto, com sintoma idêntico ao de
+> fiação errada.
+
+> **`nSleep` manda dormir, não acorda.** É ativo em baixo, disparado por borda de
+> descida, e tem pull-up interno — o chip liga acordado. O fio é opcional no bring-up;
+> serve para fixar o nível e permitir comandar sleep depois.
+
+> **`TXD_LS` e `UART_LS` são os dois extremos do `R_UART`** (1,5 kΩ, já populado na
+> placa de avaliação — medido e confirmado). Se na sua placa a medição entre eles der
+> 0 Ω, é nó único: ligue o RX direto e o TX através de um resistor de 1,5 kΩ.
+
+**Transceiver → sensing (TLE9012):**
+
+| TLE9015 | TLE9012 |
+|---|---|
+| conector `LS`, pino `P` | `CON6` → `H P` |
+| conector `LS`, pino `N` | `CON6` → `H N` |
+
+O **low side do transceiver vai no high side do sensing** — nunca LS↔LS. Use o cabo
+par trançado do kit. O conector `L P`/`L N` do sensing fica livre: é a última placa da
+cadeia, e por isso o firmware passa `final_node = true`.
+
+A sensing board é alimentada à parte, com **5 V a 60 V** nos terminais `VS`/`GND` da
+borda esquerda. **Não ligue o GND dela ao GND da Nucleo** — os dois domínios são
+galvanicamente isolados de propósito, e o link iso UART é a barreira.
 
 ---
 

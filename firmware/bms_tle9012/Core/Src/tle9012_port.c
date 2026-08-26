@@ -21,16 +21,12 @@
 /* Guarda do TX: se o DMA nao terminar nisso, algo esta travado. */
 #define TX_TIMEOUT_MS  5u
 
-/* Pino nSLEEP do TLE9015. Inicializado aqui, e nao no CubeMX, para manter todo
+/* Pino nSleep do TLE9015. Inicializado aqui, e nao no CubeMX, para manter todo
  * o hardware do link num arquivo so -- trocar de pino e uma linha, e nao exige
  * regerar o .ioc. Ajustar conforme a fiacao. */
 #define NSLEEP_PORT        GPIOB
 #define NSLEEP_PIN         GPIO_PIN_0
 #define NSLEEP_CLK_ENABLE  __HAL_RCC_GPIOB_CLK_ENABLE
-
-/* Tempo entre acordar o transceiver e comecar a falar com ele. Valor
- * conservador para bring-up; o datasheet do TLE9015 traz o numero exato. */
-#define NSLEEP_WAKE_MS     5u
 
 static UART_HandleTypeDef *s_huart;
 static volatile uint8_t    s_rx_ring[RX_RING_SIZE];
@@ -147,20 +143,21 @@ const tle9012_transport_t *tle9012_port_transport(void)
   return &s_transport;
 }
 
-void tle9012_port_wake_transceiver(void)
+void tle9012_port_inhibit_sleep(void)
 {
   GPIO_InitTypeDef gpio = {0};
 
   NSLEEP_CLK_ENABLE();
+
+  /* Nivel alto ANTES de configurar como saida, para nunca gerar a borda de
+   * descida que justamente manda o TLE9015 dormir. */
+  HAL_GPIO_WritePin(NSLEEP_PORT, NSLEEP_PIN, GPIO_PIN_SET);
 
   gpio.Pin   = NSLEEP_PIN;
   gpio.Mode  = GPIO_MODE_OUTPUT_PP;
   gpio.Pull  = GPIO_NOPULL;
   gpio.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(NSLEEP_PORT, &gpio);
-
-  HAL_GPIO_WritePin(NSLEEP_PORT, NSLEEP_PIN, GPIO_PIN_SET);
-  HAL_Delay(NSLEEP_WAKE_MS);
 }
 
 void tle9012_port_recover(void)

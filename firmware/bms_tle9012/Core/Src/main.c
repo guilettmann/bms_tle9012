@@ -257,9 +257,11 @@ int main(void)
   tle9012_port_init(&huart1);
   tle9012_bind(tle9012_port_transport());
 
-  /* Ordem obrigatoria: o transceiver acorda por hardware (nSLEEP), o sensing
-   * IC acorda por comando de leitura. Inverter a ordem nao funciona. */
-  tle9012_port_wake_transceiver();
+  /* O TLE9015 liga acordado (nSleep tem pull-up interno e so manda dormir na
+   * borda de descida), portanto aqui apenas fixamos o nivel. Ja o TLE9012
+   * precisa mesmo ser acordado, e isso se faz com um comando de leitura.
+   * Se o nSleep nao estiver fiado, a primeira chamada pode ser removida. */
+  tle9012_port_inhibit_sleep();
   tle9012_wakeup();
 
   chain_ready = bms_chain_init() ? 1u : 0u;
