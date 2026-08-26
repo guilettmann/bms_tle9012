@@ -68,6 +68,13 @@ volatile uint32_t meas_count;
 volatile uint32_t meas_fail_count;
 volatile uint8_t  last_status;      /* tle9012_status_t da ultima transacao */
 volatile uint8_t  chain_ready;
+
+/* Smoke test: resultado isolado do ciclo de medicao. Se smoke_ok == 1, o link
+ * inteiro esta de pe -- baudrate, MSB first, CRC, eco e DMA. */
+volatile uint8_t  smoke_ok;
+volatile uint8_t  smoke_status;     /* tle9012_status_t do readback           */
+volatile uint16_t smoke_config;     /* valor lido do CONFIG (0x36)            */
+volatile uint32_t smoke_attempts;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -86,11 +93,62 @@ static void MX_USART1_UART_Init(void);
  * @brief  Sobe a cadeia: atribui NODE_ID e configura as celulas ativas.
  * @return true se ambos os passos responderam com CRC valido.
  */
-static bool bms_chain_init(void)
+/**
+ * @brief Menor teste possivel que prova o link inteiro.
+ *
+ * Atribui o NODE_ID e le o CONFIG de volta. Uma transacao de escrita e uma de
+ * leitura, com valor esperado conhecido: se fecha, entao baudrate, MSB first,
+ * CRC8, CRC3, eco e DMA estao todos corretos. Testar isto antes de tentar
+ * medir tensao evita confundir erro de link com erro de medicao.
+ */
+static bool bms_smoke_test(void)
 {
+  smoke_attempts++;
+  smoke_ok = 0u;
+
   /* Unico IC na cadeia, portanto ele e tambem o final node. Sem o bit FN
    * o broadcast nunca responde e tudo da timeout. */
-  if (tle9012_assign_node_id(BMS_NODE_ID, true) != TLE9012_OK)
+  tle9012_status_t st = tle9012_assign_node_id(BMS_NODE_ID, true);
+
+  if (st != TLE9012_OK)
+  {
+    smoke_status = (uint8_t)st;
+    return false;
+  }
+
+  uint16_t config = 0u;
+  st = tle9012_read_reg(BMS_NODE_ID, TLE9012_REG_CONFIG, &config);
+
+  smoke_status = (uint8_t)st;
+  smoke_config = config;
+
+  if (st != TLE9012_OK)
+  {
+    return false;
+  }
+
+  /* O NODE_ID atribuido deve aparecer nos bits baixos do CONFIG. */
+  if ((config & 0x3Fu) != BMS_NODE_ID)
+  {
+    return false;
+  }
+
+  smoke_ok = 1u;
+  return true;
+}
+
+/**
+ * @brief Sobe a cadeia: smoke test, desativa open load e configura as celulas.
+ */
+static bool bms_chain_init(void)
+{
+  if (!bms_smoke_test())
+  {
+    return false;
+  }
+
+  /* Ladder resistivo da placa de avaliacao dispara open load falso. */
+  if (tle9012_disable_open_load(BMS_NODE_ID) != TLE9012_OK)
   {
     return false;
   }
@@ -199,6 +257,11 @@ int main(void)
   tle9012_port_init(&huart1);
   tle9012_bind(tle9012_port_transport());
 
+  /* Ordem obrigatoria: o transceiver acorda por hardware (nSLEEP), o sensing
+   * IC acorda por comando de leitura. Inverter a ordem nao funciona. */
+  tle9012_port_wake_transceiver();
+  tle9012_wakeup();
+
   chain_ready = bms_chain_init() ? 1u : 0u;
   /* USER CODE END 2 */
 
@@ -229,8 +292,9 @@ int main(void)
     if (chain_ready == 0u)
     {
       /* Cadeia nao subiu: tenta de novo em vez de travar. Inspecionar
-       * tle_dbg_tx / tle_dbg_rx / tle_dbg_status no Live Expressions. */
+       * tp_dbg_avail_on_timeout primeiro, depois tle_dbg_rx / smoke_status. */
       HAL_Delay(500u);
+      tle9012_wakeup();
       chain_ready = bms_chain_init() ? 1u : 0u;
       continue;
     }

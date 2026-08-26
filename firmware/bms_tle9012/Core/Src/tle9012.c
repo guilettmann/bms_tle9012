@@ -161,6 +161,36 @@ tle9012_status_t tle9012_read_reg(uint8_t node_id, uint8_t addr, uint16_t *out)
 
 /* ------------------------------------------------------------------------- */
 
+void tle9012_wakeup(void)
+{
+  uint16_t scratch = 0u;
+
+  /* O proprio ato de enviar a leitura acorda o dispositivo; a resposta
+   * normalmente nao vem e isso e esperado. Dois disparos porque o primeiro
+   * pode ser inteiramente consumido pelo despertar. */
+  (void)tle9012_read_reg(TLE9012_UNASSIGNED_ID, TLE9012_REG_CONFIG, &scratch);
+
+  if (s_tp->delay_us != NULL)
+  {
+    s_tp->delay_us(1000u);
+  }
+
+  (void)tle9012_read_reg(TLE9012_UNASSIGNED_ID, TLE9012_REG_CONFIG, &scratch);
+}
+
+tle9012_status_t tle9012_disable_open_load(uint8_t node_id)
+{
+  const tle9012_status_t st = tle9012_write_reg(node_id, TLE9012_REG_OL_OV_THR,
+                                                TLE9012_OL_THR_DISABLED);
+  if (st != TLE9012_OK)
+  {
+    return st;
+  }
+
+  return tle9012_write_reg(node_id, TLE9012_REG_OL_UV_THR,
+                           TLE9012_OL_THR_DISABLED);
+}
+
 tle9012_status_t tle9012_assign_node_id(uint8_t new_id, bool final_node)
 {
   if ((new_id == 0u) || (new_id >= TLE9012_BROADCAST_ID))

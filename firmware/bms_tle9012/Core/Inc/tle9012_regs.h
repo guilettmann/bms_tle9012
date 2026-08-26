@@ -16,7 +16,9 @@
 #define TLE9012_REG_OL_OV_THR     0x02u  /* Tabela 13  - threshold sobretensao*/
 #define TLE9012_REG_OL_UV_THR     0x03u  /* Tabela 14  - threshold subtensao  */
 #define TLE9012_REG_TEMP_CONF     0x04u  /* Tabela 17  - sensores NTC         */
+#define TLE9012_REG_OP_MODE       0x14u  /* Tabela 25  - sleep / reset        */
 #define TLE9012_REG_BAL_CURR_THR  0x15u  /* Tabela 18  - correntes de balanc. */
+#define TLE9012_REG_BAL_SETTINGS  0x16u  /* Tabela 24  - drivers de balanc.   */
 #define TLE9012_REG_AVM_CONFIG    0x17u  /* Tabela 22  - medida auxiliar      */
 #define TLE9012_REG_MEAS_CTRL     0x18u  /* Tabela 19  - controle de medicao  */
 #define TLE9012_REG_CONFIG        0x36u  /* Tabela 7   - NODE_ID              */
@@ -39,5 +41,15 @@
 
 /** Fundo de escala do ADC de celula, em milivolts (secao 3.4.1: FSR = 5,0 V). */
 #define TLE9012_PCVM_FSR_MV           5000u
+
+/**
+ * Desativa o diagnostico de open load (secao 1.1.2, nota da Figura 2).
+ *
+ * Com o ladder resistivo da placa de avaliacao o open load e detectado
+ * FALSAMENTE, porque a resistencia do divisor e muito maior que a resistencia
+ * interna de uma celula real. O manual manda zerar OL_THR_MAX e OL_THR_MIN.
+ * Ao migrar para celulas reais, remover isto e configurar os thresholds.
+ */
+#define TLE9012_OL_THR_DISABLED       0x0000u
 
 #endif /* TLE9012_REGS_H */

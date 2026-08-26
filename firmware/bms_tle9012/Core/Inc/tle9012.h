@@ -45,6 +45,25 @@ typedef struct
 /** Associa o driver a uma implementacao de transporte. Chamar antes de tudo. */
 void tle9012_bind(const tle9012_transport_t *transport);
 
+/**
+ * @brief Acorda a cadeia enviando um comando de leitura descartavel.
+ *
+ * O manual (secao 3.6.2, passo 2) estabelece que um comando de leitura acorda
+ * o dispositivo. Esse primeiro comando e consumido pelo despertar e costuma
+ * nao responder, portanto o resultado e deliberadamente ignorado.
+ *
+ * @note Nao acorda o TLE9015: o transceiver e acordado por hardware, pelo pino
+ *       nSLEEP, antes desta chamada.
+ */
+void tle9012_wakeup(void);
+
+/**
+ * @brief Desativa o diagnostico de open load.
+ * @note  Obrigatorio ao usar o ladder resistivo da placa de avaliacao, que
+ *        dispara open load falso. Remover ao migrar para celulas reais.
+ */
+tle9012_status_t tle9012_disable_open_load(uint8_t node_id);
+
 /* --- Acesso de baixo nivel ---------------------------------------------- */
 tle9012_status_t tle9012_write_reg(uint8_t node_id, uint8_t addr, uint16_t data);
 tle9012_status_t tle9012_read_reg (uint8_t node_id, uint8_t addr, uint16_t *out);
