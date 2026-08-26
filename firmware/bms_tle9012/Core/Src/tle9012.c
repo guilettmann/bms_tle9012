@@ -230,6 +230,12 @@ tle9012_status_t tle9012_set_cell_count(uint8_t node_id, uint8_t n_cells)
   return tle9012_write_reg(node_id, TLE9012_REG_PART_CONFIG, mask);
 }
 
+tle9012_status_t tle9012_kick_watchdog(uint8_t node_id)
+{
+  return tle9012_write_reg(node_id, TLE9012_REG_WDOG_CNT,
+                           TLE9012_WDOG_CNT_RELOAD);
+}
+
 tle9012_status_t tle9012_start_measurement(uint8_t node_id)
 {
   return tle9012_write_reg(node_id, TLE9012_REG_MEAS_CTRL,

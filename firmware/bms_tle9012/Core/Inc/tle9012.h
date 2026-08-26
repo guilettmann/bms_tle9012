@@ -87,6 +87,16 @@ tle9012_status_t tle9012_assign_node_id(uint8_t new_id, bool final_node);
 
 tle9012_status_t tle9012_set_cell_count(uint8_t node_id, uint8_t n_cells);
 
+/**
+ * @brief Realimenta o watchdog do TLE9012, recarregando WD_CNT no maximo.
+ *
+ * O contador decrementa sozinho; ao zerar, o dispositivo entra em sleep e o
+ * NODE_ID volta a 0, derrubando a comunicacao sem aviso. Precisa ser chamado
+ * periodicamente enquanto a cadeia estiver ativa -- o firmware de demo da
+ * Infineon usa 500 ms, e o ciclo de medicao de 100 ms cobre isso com folga.
+ */
+tle9012_status_t tle9012_kick_watchdog(uint8_t node_id);
+
 /** Dispara a medicao primaria (PCVM) em 16 bits. */
 tle9012_status_t tle9012_start_measurement(uint8_t node_id);
 

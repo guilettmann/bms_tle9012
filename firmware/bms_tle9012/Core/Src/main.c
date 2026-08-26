@@ -162,6 +162,14 @@ static bool bms_chain_init(void)
     return false;
   }
 
+  /* Recarrega o watchdog logo apos atribuir o NODE_ID: o manual avisa que a
+   * propria inicializacao pode demorar mais que o intervalo do watchdog, e
+   * nesse caso o ID recem-atribuido seria perdido. */
+  if (tle9012_kick_watchdog(BMS_NODE_ID) != TLE9012_OK)
+  {
+    return false;
+  }
+
   /* Ladder resistivo da placa de avaliacao dispara open load falso. */
   if (tle9012_disable_open_load(BMS_NODE_ID) != TLE9012_OK)
   {
@@ -190,7 +198,15 @@ static void bms_measure_cycle(void)
 {
   uint16_t mv[BMS_NUM_CELLS];
 
-  tle9012_status_t st = tle9012_start_measurement(BMS_NODE_ID);
+  /* Realimenta o watchdog ANTES de medir. Se ele zerar, o TLE9012 dorme e o
+   * NODE_ID volta a 0 -- a comunicacao cai sem nenhum sintoma alem de
+   * timeouts, que e facil confundir com problema de fiacao. */
+  tle9012_status_t st = tle9012_kick_watchdog(BMS_NODE_ID);
+
+  if (st == TLE9012_OK)
+  {
+    st = tle9012_start_measurement(BMS_NODE_ID);
+  }
 
   if (st == TLE9012_OK)
   {
