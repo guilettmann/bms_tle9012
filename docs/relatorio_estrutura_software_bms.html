@@ -120,7 +120,7 @@
   </div>
   <div class="meta">
     Documento T&eacute;cnico<br>
-    Rev. 1.4<br>
+    Rev. 1.5<br>
     2026-08-25
   </div>
 </div>
@@ -164,6 +164,16 @@
     <li><a href="#s7">Estrutura de Diret&oacute;rios do Projeto</a></li>
     <li><a href="#s8">Fluxo de Atualiza&ccedil;&atilde;o em Campo</a></li>
     <li><a href="#s9b">Valida&ccedil;&atilde;o em Bancada</a></li>
+    <li><a href="#s10">Diagn&oacute;stico e Prote&ccedil;&otilde;es</a>
+      <ol>
+        <li><a href="#s101">C&oacute;digo de falha</a></li>
+        <li><a href="#s102">Bits do GEN_DIAG</a></li>
+        <li><a href="#s103">M&aacute;scaras por c&eacute;lula</a></li>
+        <li><a href="#s104">Histerese</a></li>
+        <li><a href="#s105">Inje&ccedil;&atilde;o de falha</a></li>
+        <li><a href="#s106">Sinaliza&ccedil;&atilde;o no LD2</a></li>
+      </ol>
+    </li>
     <li><a href="#s9">Refer&ecirc;ncias</a>
       <ol>
         <li><a href="#s9">Uso da Biblioteca de Refer&ecirc;ncia</a></li>
@@ -934,7 +944,206 @@ done&rdquo;</em>. Fazer polling desse bit substitui o atraso fixo arbitrado, com
 leitura sai assim que fica pronta, e uma convers&atilde;o que n&atilde;o conclui vira erro expl&iacute;cito
 em vez de dado lido cedo demais.</p>
 
-<h2 id="s9">10. Refer&ecirc;ncias</h2>
+<h2 id="s10">10. Diagn&oacute;stico e Prote&ccedil;&otilde;es</h2>
+
+<h3 id="s101">10.1 C&oacute;digo de falha</h3>
+
+<p>M&aacute;scara de bit &eacute; ileg&iacute;vel em depurador. A vari&aacute;vel <code>fault_code</code> &eacute; de
+tipo <code>enum</code>, e o Live Expressions do CubeIDE exibe o <strong>nome</strong> do
+enumerado em vez do n&uacute;mero. Ao lado, <code>fault_cell</code> indica a c&eacute;lula ou canal
+afetado (<code>0xFF</code> quando a falha n&atilde;o &eacute; por c&eacute;lula).</p>
+
+<p>A ordem &eacute; de <strong>prioridade</strong>, n&atilde;o de ocorr&ecirc;ncia: a falha mais grave ativa
+vence. Perda de comunica&ccedil;&atilde;o vem antes de tudo porque, sem dado, nenhuma outra
+prote&ccedil;&atilde;o significa nada. Sobretens&atilde;o vem antes de subtens&atilde;o porque sobrecarga tem
+consequ&ecirc;ncia t&eacute;rmica, enquanto subtens&atilde;o apenas degrada.</p>
+
+<table>
+<thead>
+  <tr><td>Prio</td><td>C&oacute;digo</td><td>Origem</td><td>Significado</td></tr>
+</thead>
+<tbody>
+  <tr><td class="num">1</td><td class="id">BMS_FAULT_CHAIN_DOWN</td><td>firmware</td><td>Cadeia caiu, sem comunica&ccedil;&atilde;o</td></tr>
+  <tr><td class="num">2</td><td class="id">BMS_FAULT_DATA_STALE</td><td>firmware</td><td>Medi&ccedil;&atilde;o obsoleta</td></tr>
+  <tr class="destaque"><td class="num">3</td><td class="id">BMS_FAULT_CELL_OV</td><td>hardware</td><td>Sobretens&atilde;o de c&eacute;lula</td></tr>
+  <tr class="destaque"><td class="num">4</td><td class="id">BMS_FAULT_CELL_UV</td><td>hardware</td><td>Subtens&atilde;o de c&eacute;lula</td></tr>
+  <tr><td class="num">5</td><td class="id">BMS_FAULT_EXT_OVERTEMP</td><td>hardware</td><td>Sobretemperatura no NTC</td></tr>
+  <tr><td class="num">6</td><td class="id">BMS_FAULT_INT_OVERTEMP</td><td>hardware</td><td>Sobretemperatura interna do CI</td></tr>
+  <tr><td class="num">7</td><td class="id">BMS_FAULT_UNDERTEMP</td><td><strong>firmware</strong></td><td>Subtemperatura &mdash; o CI n&atilde;o detecta</td></tr>
+  <tr><td class="num">8</td><td class="id">BMS_FAULT_OPEN_LOAD</td><td>hardware</td><td>Fio de sensoriamento aberto</td></tr>
+  <tr><td class="num">9</td><td class="id">BMS_FAULT_ADC</td><td>hardware</td><td>Soma dos PCVM diverge do BVM</td></tr>
+  <tr><td class="num">10</td><td class="id">BMS_FAULT_INTERNAL_IC</td><td>hardware</td><td>Erro interno do TLE9012</td></tr>
+  <tr><td class="num">11</td><td class="id">BMS_FAULT_REG_CRC</td><td>hardware</td><td>CRC de registrador</td></tr>
+  <tr><td class="num">12</td><td class="id">BMS_FAULT_PS_SLEEP</td><td>hardware</td><td>Sleep por erro de alimenta&ccedil;&atilde;o</td></tr>
+  <tr><td class="num">13</td><td class="id">BMS_FAULT_BALANCING</td><td>hardware</td><td>Corrente de balanceamento fora do previsto</td></tr>
+</tbody>
+</table>
+
+<div class="aviso">
+  <div class="rot">Hardware ou firmware &mdash; a distin&ccedil;&atilde;o importa</div>
+  As falhas marcadas <strong>hardware</strong> s&atilde;o detectadas pelo pr&oacute;prio TLE9012 e
+  continuam valendo mesmo se o firmware travar. A <strong>subtemperatura</strong> &eacute; a
+  &uacute;nica detectada s&oacute; em firmware, porque o CI n&atilde;o possui limiar de frio &mdash; existe
+  apenas <code>EXT_OT_THR</code>, para o lado quente. Uma prote&ccedil;&atilde;o que depende do
+  firmware rodando &eacute; estruturalmente mais fraca, e isso deve ser declarado.
+</div>
+
+<h3 id="s102">10.2 Bits do GEN_DIAG (0x0B)</h3>
+
+<table>
+<thead>
+  <tr><td>Bit</td><td>M&aacute;scara</td><td>Campo</td><td>Significado</td></tr>
+</thead>
+<tbody>
+  <tr><td class="num">0</td><td class="id">0x0001</td><td>UART_WAKEUP</td><td>status &mdash; origem do wake-up</td></tr>
+  <tr><td class="num">1</td><td class="id">0x0002</td><td>MOT_MOB_N</td><td>status &mdash; 0 = PoB, 1 = PoT</td></tr>
+  <tr><td class="num">2</td><td class="id">0x0004</td><td>BAL_ACTIVE</td><td>status &mdash; balanceamento em curso</td></tr>
+  <tr><td class="num">3</td><td class="id">0x0008</td><td>LOCK_MEAS</td><td>status &mdash; medi&ccedil;&atilde;o em curso</td></tr>
+  <tr><td class="num">4</td><td class="id">0x0010</td><td>RR_ACTIVE</td><td>status &mdash; round robin ativo</td></tr>
+  <tr><td class="num">5</td><td class="id">0x0020</td><td>PS_ERR_SLEEP</td><td>sleep por erro de alimenta&ccedil;&atilde;o</td></tr>
+  <tr><td class="num">6</td><td class="id">0x0040</td><td>ADC_ERR</td><td>soma dos PCVM diverge do BVM</td></tr>
+  <tr><td class="num">7</td><td class="id">0x0080</td><td>OL_ERR</td><td>open load</td></tr>
+  <tr><td class="num">8</td><td class="id">0x0100</td><td>INT_IC_ERR</td><td>erro interno do CI</td></tr>
+  <tr><td class="num">9</td><td class="id">0x0200</td><td>REG_CRC_ERR</td><td>CRC de registrador</td></tr>
+  <tr><td class="num">10</td><td class="id">0x0400</td><td>EXT_T_ERR</td><td>sobretemperatura externa</td></tr>
+  <tr><td class="num">11</td><td class="id">0x0800</td><td>INT_OT</td><td>sobretemperatura interna</td></tr>
+  <tr><td class="num">12</td><td class="id">0x1000</td><td>CELL_UV</td><td>resumo de subtens&atilde;o</td></tr>
+  <tr><td class="num">13</td><td class="id">0x2000</td><td>CELL_OV</td><td>resumo de sobretens&atilde;o</td></tr>
+  <tr><td class="num">14</td><td class="id">0x4000</td><td>BAL_ERR_UC</td><td>subcorrente de balanceamento</td></tr>
+  <tr><td class="num">15</td><td class="id">0x8000</td><td>BAL_ERR_OC</td><td>sobrecorrente de balanceamento</td></tr>
+</tbody>
+</table>
+
+<div class="nota">
+  <div class="rot">Nota</div>
+  <strong>Os bits 0 a 4 s&atilde;o status de opera&ccedil;&atilde;o, n&atilde;o erro.</strong> Ver
+  <code>0x0010</code> no <code>GEN_DIAG</code> significa apenas que o round robin est&aacute;
+  rodando. Por isso o acumulador <code>fault_latched</code> mascara com
+  <code>0xFFE0</code>, guardando s&oacute; do bit 5 para cima.
+</div>
+
+<h3 id="s103">10.3 M&aacute;scaras por c&eacute;lula</h3>
+
+<p>Os registradores <code>CELL_UV</code> (0x0C) e <code>CELL_OV</code> (0x0D) trazem um bit por
+c&eacute;lula, nos bits 0 a 11: <strong>bit <em>i</em> = c&eacute;lula <em>i</em></strong>.</p>
+
+<table>
+<thead>
+  <tr><td>Valor</td><td>Significa</td></tr>
+</thead>
+<tbody>
+  <tr><td class="id">0x0001</td><td>somente a c&eacute;lula 0</td></tr>
+  <tr><td class="id">0x0800</td><td>somente a c&eacute;lula 11</td></tr>
+  <tr><td class="id">0x0FFF</td><td>todas as 12</td></tr>
+</tbody>
+</table>
+
+<p>Com o ladder resistivo todas as c&eacute;lulas leem igual, ent&atilde;o uma inje&ccedil;&atilde;o de UV ou OV
+acende <strong>todas de uma vez</strong>: espera-se <code>0x0FFF</code>.</p>
+
+<h4>Identifica&ccedil;&atilde;o do escravo</h4>
+
+<p>Cada CSC da cadeia tem seu pr&oacute;prio <code>NODE_ID</code> e seus pr&oacute;prios registradores de
+diagn&oacute;stico &mdash; a leitura j&aacute; &eacute; endere&ccedil;ada por n&oacute;, ent&atilde;o distinguir de qual
+escravo veio a falha &eacute; imediato. A vari&aacute;vel <code>fault_node</code> registra isso.</p>
+
+<div class="aviso">
+  <div class="rot">Limita&ccedil;&atilde;o atual</div>
+  O firmware &eacute; <strong>single-slave</strong>: tudo est&aacute; fixado em
+  <code>BMS_NODE_ID = 1</code>. Suportar N escravos exige transformar os snapshots
+  (<code>cell_mv</code>, <code>fault_uv</code>, <code>temp_ohms</code>&hellip;) em matrizes
+  indexadas por n&oacute; e iterar a inicializa&ccedil;&atilde;o at&eacute; o &uacute;ltimo IC, marcando apenas ele
+  como <em>final node</em>. O driver j&aacute; recebe <code>node_id</code> em todas as fun&ccedil;&otilde;es;
+  a mudan&ccedil;a &eacute; de camada de aplica&ccedil;&atilde;o.
+</div>
+
+<h3 id="s104">10.4 Histerese</h3>
+
+<p>Os flags <code>CELL_UV</code> e <code>CELL_OV</code> s&atilde;o do tipo <code>rocw</code>:
+uma vez setados, permanecem at&eacute; algu&eacute;m escrever <code>0</code> na posi&ccedil;&atilde;o. Ou seja,
+<strong>quando limpar &eacute; decis&atilde;o do firmware</strong> &mdash; e limpar assim que a tens&atilde;o
+volta a cruzar o limiar produziria oscila&ccedil;&atilde;o cont&iacute;nua com a c&eacute;lula parada em cima
+dele.</p>
+
+<div class="arq">
+UV   seta em UV_THR          ->  limpa so acima de   UV_THR + 200 mV
+OV   seta em OV_THR          ->  limpa so abaixo de  OV_THR - 200 mV
+</div>
+
+<p>Tr&ecirc;s propriedades deliberadas:</p>
+
+<ul>
+  <li><strong>A falha sempre seta no limiar exato.</strong> A histerese atrasa apenas a
+      recupera&ccedil;&atilde;o, nunca a detec&ccedil;&atilde;o.</li>
+  <li><strong>S&oacute; limpa com <code>cell_data_valid = 1</code>.</strong> Dado obsoleto nunca
+      pode justificar sair de um estado de falha.</li>
+  <li><strong>A limpeza &eacute; por c&eacute;lula.</strong> A c&eacute;lula 3 pode sair de falha sem apagar
+      a da c&eacute;lula 7 &mdash; o que importa num pack real, onde as c&eacute;lulas divergem.</li>
+</ul>
+
+<div class="regra">
+  <div class="rot">Armadilha: o bit-resumo &eacute; separado</div>
+  Limpar <code>CELL_UV</code> / <code>CELL_OV</code> <strong>n&atilde;o</strong> limpa os bits 12 e 13
+  do <code>GEN_DIAG</code>, que s&atilde;o resumos em registrador distinto. Sem limp&aacute;-los tamb&eacute;m,
+  o <code>GEN_DIAG</code> fica preso exibindo a falha antiga indefinidamente. Foi exatamente
+  esse o sintoma observado em bancada antes da corre&ccedil;&atilde;o.
+</div>
+
+<h3 id="s105">10.5 Inje&ccedil;&atilde;o de falha para demonstra&ccedil;&atilde;o</h3>
+
+<p>Seis modos, cicl&aacute;veis pelo bot&atilde;o azul da Nucleo &mdash; o que dispensa depurador durante
+uma inspe&ccedil;&atilde;o t&eacute;cnica. Tamb&eacute;m ajust&aacute;veis por <code>sim_request</code>.</p>
+
+<table>
+<thead>
+  <tr><td>Modo</td><td>Como a condi&ccedil;&atilde;o &eacute; criada</td><td>GEN_DIAG esperado</td></tr>
+</thead>
+<tbody>
+  <tr><td class="id">UNDERVOLTAGE</td><td>Limiar de UV movido acima da tens&atilde;o medida</td><td class="id">0x1000</td></tr>
+  <tr><td class="id">OVERVOLTAGE</td><td>Limiar de OV movido abaixo da tens&atilde;o medida</td><td class="id">0x2000</td></tr>
+  <tr><td class="id">OVERTEMP</td><td>Limiar de OT no m&aacute;ximo</td><td class="id">0x0400</td></tr>
+  <tr><td class="id">OPEN_LOAD</td><td>Diagn&oacute;stico reabilitado com ladder resistivo</td><td class="id">0x0080</td></tr>
+  <tr><td class="id">COMM_LOSS</td><td>CI enviado para sleep</td><td>&mdash;</td></tr>
+  <tr><td class="id">UNDERTEMP</td><td>Limiar de firmware abaixo da leitura</td><td><strong>inalterado</strong></td></tr>
+</tbody>
+</table>
+
+<div class="decisao">
+  <div class="rot">Decis&atilde;o de projeto</div>
+  <div class="peca">Inje&ccedil;&atilde;o real, n&atilde;o flag forjado</div>
+  <p>Nenhum modo escreve em registrador de diagn&oacute;stico. Cada um cria uma
+  <strong>condi&ccedil;&atilde;o</strong> que o TLE9012 detecta pelo caminho normal &mdash; o caminho de
+  detec&ccedil;&atilde;o, os registradores e o intertravamento que desliga o balanceamento s&atilde;o os
+  mesmos de uma falha real. O que muda &eacute; a origem da condi&ccedil;&atilde;o, n&atilde;o a detec&ccedil;&atilde;o.</p>
+  <p>Forjar os flags acenderia o LED sem provar nada, e n&atilde;o sobreviveria a um avaliador
+  que pedisse para ver o <code>GEN_DIAG</code>. Declarar <em>&ldquo;o limiar foi deslocado, a
+  detec&ccedil;&atilde;o &eacute; real&rdquo;</em> &eacute; mais forte do que alegar falha genu&iacute;na.</p>
+  <p>Repare que <code>UNDERTEMP</code> deixa o <code>GEN_DIAG</code> intacto: &eacute; a confirma&ccedil;&atilde;o
+  vis&iacute;vel de que aquela prote&ccedil;&atilde;o &eacute; puramente de firmware.</p>
+</div>
+
+<h3 id="s106">10.6 Sinaliza&ccedil;&atilde;o no LD2</h3>
+
+<table>
+<thead>
+  <tr><td>Estado do LED</td><td>Significado</td></tr>
+</thead>
+<tbody>
+  <tr><td>Piscando a 5 Hz</td><td>Vivo e sem falha</td></tr>
+  <tr><td>Aceso fixo</td><td>Falha ativa</td></tr>
+  <tr><td>Apagado</td><td>Firmware travado</td></tr>
+</tbody>
+</table>
+
+<p>Sa&uacute;de sinalizada por <strong>pisca</strong>, e n&atilde;o por LED apagado, &eacute; deliberado: se apagado
+significasse &ldquo;tudo bem&rdquo;, firmware travado seria indistingu&iacute;vel de opera&ccedil;&atilde;o normal.
+Um AMS n&atilde;o pode ter estado de falha confund&iacute;vel com estado morto.</p>
+
+<p>A condi&ccedil;&atilde;o de acender cobre mais que os flags do CI: <strong>cadeia ca&iacute;da</strong> e
+<strong>dado obsoleto</strong> tamb&eacute;m acendem. Para um AMS, n&atilde;o saber a tens&atilde;o &eacute; t&atilde;o
+grave quanto saber que ela est&aacute; errada.</p>
+
+<h2 id="s9">11. Refer&ecirc;ncias</h2>
 <ol class="refs">
   <li>Infineon, <em>TLE9012DQU, TLE9015DQU &mdash; User Manual</em>, Rev. 1.0, Z8F80064984, 2022-01-24.</li>
   <li>STMicroelectronics, <em>STM32G4 Series &mdash; Reference Manual</em>, RM0440 (cobre a linha G491).</li>

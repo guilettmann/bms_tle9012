@@ -204,6 +204,70 @@ uint32_t tle9012_temp_raw_to_ohms(const tle9012_temp_raw_t *t,
  */
 uint32_t tle9012_compensate_parallel(uint32_t r_measured, uint32_t r_parallel);
 
+/* --- Protecoes ----------------------------------------------------------- */
+
+/** Estado de falha do dispositivo, lido de uma vez. */
+typedef struct
+{
+  uint16_t gen_diag;  /**< GEN_DIAG completo. Bits 0-4 sao status, nao erro. */
+  uint16_t cell_uv;   /**< bit i = subtensao  na celula i                    */
+  uint16_t cell_ov;   /**< bit i = sobretensao na celula i                   */
+} tle9012_faults_t;
+
+/**
+ * @brief Configura os limiares de sub e sobretensao, e o de open load.
+ *
+ * Os quatro campos moram em dois registradores compartilhados:
+ *   OL_OV_THR = [OL_THR_MAX : OV_THR]
+ *   OL_UV_THR = [OL_THR_MIN : UV_THR]
+ *
+ * Por isso sao escritos juntos: escrever so um dos campos zeraria o outro.
+ *
+ * @param uv_mv      limiar de subtensao, em mV.
+ * @param ov_mv      limiar de sobretensao, em mV.
+ * @param ol_min_mv  queda minima para diagnostico de open load, em mV.
+ * @param ol_max_mv  queda maxima para diagnostico de open load, em mV.
+ *
+ * @note Passar 0 nos dois de open load desativa o diagnostico -- obrigatorio
+ *       com o ladder resistivo da placa de avaliacao.
+ * @note O passo e de 4,88 mV (5 V / 1024). O limiar de UV e arredondado para
+ *       CIMA e o de OV para BAIXO, de modo que o arredondamento sempre cause
+ *       disparo mais cedo, nunca mais tarde.
+ */
+tle9012_status_t tle9012_set_thresholds(uint8_t node_id,
+                                        uint16_t uv_mv, uint16_t ov_mv,
+                                        uint16_t ol_min_mv, uint16_t ol_max_mv);
+
+/** Le GEN_DIAG, CELL_UV e CELL_OV numa passada. */
+tle9012_status_t tle9012_read_faults(uint8_t node_id, tle9012_faults_t *out);
+
+/**
+ * @brief Limpa as falhas latcheadas.
+ *
+ * Os bits de erro do GEN_DIAG sao do tipo rocwl: limpam ao receber '0' na
+ * posicao, e isso tambem reseta o registrador detalhado associado. Uma escrita
+ * de 0x0000 limpa tudo, inclusive CELL_UV e CELL_OV.
+ *
+ * @warning Limpar falha nao resolve a causa. Só chame depois de tratar.
+ */
+tle9012_status_t tle9012_clear_faults(uint8_t node_id);
+
+/**
+ * @brief Limpa seletivamente os flags de UV e OV, por celula.
+ *
+ * Os registradores CELL_UV e CELL_OV sao do tipo rocw: escrever '0' numa
+ * posicao limpa aquele bit, escrever '1' o preserva. Isto permite limpar a
+ * falha de uma celula sem apagar a das outras -- necessario para histerese
+ * por celula.
+ *
+ * @param uv_clear  bits a LIMPAR em CELL_UV (bit i = celula i).
+ * @param ov_clear  bits a LIMPAR em CELL_OV.
+ *
+ * @note Diferente de tle9012_clear_faults(), que zera tudo de uma vez.
+ */
+tle9012_status_t tle9012_clear_cell_flags(uint8_t node_id,
+                                          uint16_t uv_clear, uint16_t ov_clear);
+
 /* --- Multiread ----------------------------------------------------------- */
 
 /* 96 porque a primeira sonda saturou em 48. Hipoteses para o tamanho real:

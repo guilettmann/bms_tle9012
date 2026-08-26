@@ -98,6 +98,44 @@
  */
 #define TLE9012_RR_CONFIG_SYNC_ON     0x80A4u
 
+/* --- Thresholds de tensao ------------------------------------------------ */
+
+/**
+ * Layout de OL_OV_THR (0x02) e OL_UV_THR (0x03), Tabelas 13 a 16:
+ *   bits [9:0]   OV_THR / UV_THR, em passos de V_OVUV_LSB
+ *   bits [15:10] OL_THR_MAX / OL_THR_MIN, em passos de 20 mV
+ *
+ * V_OVUV_LSB = 5 V / 1024 = 4,8828 mV. Confere com o exemplo do manual:
+ * 4,6 V / 4,8828 mV = 942 = 0x3AE, e 0xFFAE tem 0x3AE nos 10 bits baixos.
+ */
+#define TLE9012_OVUV_THR_MASK         0x03FFu
+#define TLE9012_OL_THR_SHIFT          10u
+#define TLE9012_OL_THR_MASK           0x003Fu
+#define TLE9012_OVUV_FSR_MV           5000u   /* fundo de escala, 10 bits     */
+#define TLE9012_OL_THR_LSB_MV         20u     /* passo do threshold de OL      */
+
+/* --- Bits do GEN_DIAG (0x0B), secao 4.11 --------------------------------- */
+
+#define TLE9012_DIAG_UART_WAKEUP      0x0001u  /* bit 0,  somente leitura     */
+#define TLE9012_DIAG_MOT_MOB_N        0x0002u  /* bit 1,  0=PoB, 1=PoT        */
+#define TLE9012_DIAG_BAL_ACTIVE       0x0004u  /* bit 2                       */
+#define TLE9012_DIAG_LOCK_MEAS        0x0008u  /* bit 3,  medicao em curso    */
+#define TLE9012_DIAG_RR_ACTIVE        0x0010u  /* bit 4                       */
+#define TLE9012_DIAG_PS_ERR_SLEEP     0x0020u  /* bit 5                       */
+#define TLE9012_DIAG_ADC_ERR          0x0040u  /* bit 6                       */
+#define TLE9012_DIAG_OL_ERR           0x0080u  /* bit 7                       */
+#define TLE9012_DIAG_INT_IC_ERR       0x0100u  /* bit 8                       */
+#define TLE9012_DIAG_REG_CRC_ERR      0x0200u  /* bit 9                       */
+#define TLE9012_DIAG_EXT_T_ERR        0x0400u  /* bit 10                      */
+#define TLE9012_DIAG_INT_OT           0x0800u  /* bit 11                      */
+#define TLE9012_DIAG_CELL_UV          0x1000u  /* bit 12                      */
+#define TLE9012_DIAG_CELL_OV          0x2000u  /* bit 13                      */
+#define TLE9012_DIAG_BAL_ERR_UC       0x4000u  /* bit 14                      */
+#define TLE9012_DIAG_BAL_ERR_OC       0x8000u  /* bit 15                      */
+
+/** Bits de falha do GEN_DIAG -- os bits 0 a 4 sao status, nao erro. */
+#define TLE9012_DIAG_FAULT_MASK       0xFFE0u
+
 /** Bit FN (Final Node) no campo de dados do CONFIG. Tabela 10: 0x0804 = FN + ID 4. */
 #define TLE9012_CONFIG_FINAL_NODE     0x0800u
 

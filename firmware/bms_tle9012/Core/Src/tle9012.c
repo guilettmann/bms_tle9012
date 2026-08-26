@@ -237,6 +237,116 @@ void tle9012_force_reset(uint8_t node_id)
   }
 }
 
+/* --- Protecoes ----------------------------------------------------------- */
+
+/** Converte mV para codigo de 10 bits, arredondando para baixo. */
+static uint16_t ovuv_code_floor(uint16_t mv)
+{
+  const uint32_t code = ((uint32_t)mv * 1024uL) / TLE9012_OVUV_FSR_MV;
+  return (uint16_t)((code > TLE9012_OVUV_THR_MASK)
+                    ? TLE9012_OVUV_THR_MASK : code);
+}
+
+/** Converte mV para codigo de 10 bits, arredondando para cima. */
+static uint16_t ovuv_code_ceil(uint16_t mv)
+{
+  const uint32_t code = (((uint32_t)mv * 1024uL) + (TLE9012_OVUV_FSR_MV - 1uL))
+                        / TLE9012_OVUV_FSR_MV;
+  return (uint16_t)((code > TLE9012_OVUV_THR_MASK)
+                    ? TLE9012_OVUV_THR_MASK : code);
+}
+
+static uint16_t ol_code(uint16_t mv)
+{
+  const uint32_t code = (uint32_t)mv / TLE9012_OL_THR_LSB_MV;
+  return (uint16_t)((code > TLE9012_OL_THR_MASK)
+                    ? TLE9012_OL_THR_MASK : code);
+}
+
+tle9012_status_t tle9012_set_thresholds(uint8_t node_id,
+                                        uint16_t uv_mv, uint16_t ov_mv,
+                                        uint16_t ol_min_mv, uint16_t ol_max_mv)
+{
+  if (uv_mv >= ov_mv)
+  {
+    return TLE9012_ERR_PARAM;   /* limiares invertidos */
+  }
+
+  /* Arredondamento na direcao segura: UV para cima e OV para baixo fazem o
+   * erro de quantizacao sempre disparar mais cedo, nunca mais tarde. */
+  const uint16_t ov_reg = (uint16_t)((ol_code(ol_max_mv) << TLE9012_OL_THR_SHIFT)
+                                     | ovuv_code_floor(ov_mv));
+
+  const uint16_t uv_reg = (uint16_t)((ol_code(ol_min_mv) << TLE9012_OL_THR_SHIFT)
+                                     | ovuv_code_ceil(uv_mv));
+
+  const tle9012_status_t st = tle9012_write_reg(node_id,
+                                                TLE9012_REG_OL_OV_THR, ov_reg);
+  if (st != TLE9012_OK)
+  {
+    return st;
+  }
+
+  return tle9012_write_reg(node_id, TLE9012_REG_OL_UV_THR, uv_reg);
+}
+
+tle9012_status_t tle9012_read_faults(uint8_t node_id, tle9012_faults_t *out)
+{
+  if (out == NULL)
+  {
+    return TLE9012_ERR_PARAM;
+  }
+
+  tle9012_status_t st = tle9012_read_reg(node_id, TLE9012_REG_GEN_DIAG,
+                                         &out->gen_diag);
+  if (st != TLE9012_OK)
+  {
+    return st;
+  }
+
+  st = tle9012_read_reg(node_id, TLE9012_REG_CELL_UV, &out->cell_uv);
+
+  if (st != TLE9012_OK)
+  {
+    return st;
+  }
+
+  return tle9012_read_reg(node_id, TLE9012_REG_CELL_OV, &out->cell_ov);
+}
+
+tle9012_status_t tle9012_clear_faults(uint8_t node_id)
+{
+  /* Bits rocwl: escrever '0' limpa o bit E reseta o registrador detalhado
+   * associado. Uma escrita de zero limpa GEN_DIAG, CELL_UV e CELL_OV. */
+  return tle9012_write_reg(node_id, TLE9012_REG_GEN_DIAG, 0x0000u);
+}
+
+tle9012_status_t tle9012_clear_cell_flags(uint8_t node_id,
+                                          uint16_t uv_clear, uint16_t ov_clear)
+{
+  tle9012_status_t st = TLE9012_OK;
+
+  /* rocw: '0' limpa a posicao, '1' preserva. Invertemos a mascara do que se
+   * quer limpar, mantendo em 1 tudo o que deve permanecer. */
+  if (uv_clear != 0u)
+  {
+    st = tle9012_write_reg(node_id, TLE9012_REG_CELL_UV,
+                           (uint16_t)(~uv_clear));
+    if (st != TLE9012_OK)
+    {
+      return st;
+    }
+  }
+
+  if (ov_clear != 0u)
+  {
+    st = tle9012_write_reg(node_id, TLE9012_REG_CELL_OV,
+                           (uint16_t)(~ov_clear));
+  }
+
+  return st;
+}
+
 tle9012_status_t tle9012_disable_open_load(uint8_t node_id)
 {
   const tle9012_status_t st = tle9012_write_reg(node_id, TLE9012_REG_OL_OV_THR,

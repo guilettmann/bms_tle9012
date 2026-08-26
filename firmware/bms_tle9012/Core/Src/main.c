@@ -31,6 +31,9 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
+/* As structs de estado sao definidas apos os enums e defines de que dependem;
+ * ver a secao "Estado agrupado" logo antes das variaveis privadas. */
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -43,6 +46,100 @@
  * ciclos = 300 ms sem leitura valida, tempo de sobra para distinguir um
  * glitch pontual de um link que caiu. */
 #define BMS_MAX_CONSEC_FAIL 3u
+
+/* --- Protecoes ----------------------------------------------------------- */
+
+/* Limiares de tensao de celula, em mV.
+ *
+ * ATENCAO: estes sao valores de BANCADA. Com o ladder resistivo em 12 V cada
+ * "celula" le ~1056 mV, entao limiares reais de Li-ion (2500/4200) fariam a
+ * subtensao disparar continuamente.
+ *
+ * Ao migrar para celulas reais:  UV = 2500,  OV = 4200. */
+#define BMS_UV_THR_MV       500u
+#define BMS_OV_THR_MV       2000u
+
+/**
+ * Histerese das falhas de tensao, em mV.
+ *
+ * Os flags CELL_UV e CELL_OV do TLE9012 sao latching (tipo rocw): uma vez
+ * setados, so saem quando alguem escreve zero. Ou seja, QUANDO limpar e
+ * decisao do firmware -- e limpar assim que a tensao volta a cruzar o limiar
+ * produziria oscilacao continua com a celula parada em cima dele.
+ *
+ * Com histerese:
+ *   UV limpa so quando a celula sobe acima de  (UV_THR + 200 mV)
+ *   OV limpa so quando a celula desce abaixo de (OV_THR - 200 mV)
+ *
+ * A falha SEMPRE seta no limiar exato -- a histerese atrasa apenas a
+ * recuperacao, nunca a deteccao. Numa protecao, errar para o lado de
+ * permanecer em falha e o lado seguro.
+ */
+#define BMS_FAULT_HYST_MV   200u
+
+/* Open load desativado: obrigatorio com ladder resistivo, que dispara open
+ * load falso. Ao usar celulas reais, calcular conforme a secao 3.2.3. */
+#define BMS_OL_MIN_MV       0u
+#define BMS_OL_MAX_MV       0u
+
+/* --- Codigo de falha ------------------------------------------------------ */
+
+/**
+ * Falha ativa mais severa, em forma simbolica.
+ *
+ * Existe porque as mascaras de bit sao ilegiveis em depurador: o Live
+ * Expressions do CubeIDE mostra o NOME do enumerado quando a variavel e de
+ * tipo enum, entao "BMS_FAULT_CELL_OV" aparece no lugar de "0x2000".
+ *
+ * A ordem e de prioridade decrescente -- a primeira condicao verdadeira
+ * ganha. Perda de comunicacao vem antes de tudo porque, sem dado, nenhuma
+ * outra protecao significa nada. Sobretensao vem antes de subtensao porque
+ * sobrecarga tem consequencia termica, e subtensao so degrada.
+ */
+typedef enum
+{
+  BMS_FAULT_NONE = 0,
+  BMS_FAULT_CHAIN_DOWN,     /**< cadeia caida, sem comunicacao              */
+  BMS_FAULT_DATA_STALE,     /**< medicao obsoleta                           */
+  BMS_FAULT_CELL_OV,        /**< sobretensao de celula                      */
+  BMS_FAULT_CELL_UV,        /**< subtensao de celula                        */
+  BMS_FAULT_EXT_OVERTEMP,   /**< sobretemperatura externa (NTC)             */
+  BMS_FAULT_INT_OVERTEMP,   /**< sobretemperatura interna do CI             */
+  BMS_FAULT_UNDERTEMP,      /**< subtemperatura -- deteccao em firmware     */
+  BMS_FAULT_OPEN_LOAD,      /**< fio de sensoriamento aberto                */
+  BMS_FAULT_ADC,            /**< soma dos PCVM diverge do BVM               */
+  BMS_FAULT_INTERNAL_IC,    /**< erro interno do TLE9012                    */
+  BMS_FAULT_REG_CRC,        /**< CRC de registrador                         */
+  BMS_FAULT_PS_SLEEP,       /**< sleep por erro de alimentacao              */
+  BMS_FAULT_BALANCING       /**< corrente de balanceamento fora do previsto */
+} bms_fault_code_t;
+
+/* --- Simulacao de falhas (demonstracao) ---------------------------------- */
+
+/**
+ * Modos de injecao de falha, para demonstracao em inspecao tecnica.
+ *
+ * IMPORTANTE: nenhum destes modos falsifica flag. Todos criam uma CONDICAO
+ * que o TLE9012 detecta de verdade -- o caminho de deteccao, os registradores
+ * de diagnostico e o intertravamento que desliga o balanceamento sao os
+ * mesmos de uma falha real. O que muda e a origem da condicao, nao a
+ * deteccao. Forjar os flags mostraria o LED aceso sem provar nada.
+ */
+typedef enum
+{
+  BMS_SIM_NONE = 0,       /**< operacao normal                              */
+  BMS_SIM_UNDERVOLTAGE,   /**< limiar de UV acima da tensao real            */
+  BMS_SIM_OVERVOLTAGE,    /**< limiar de OV abaixo da tensao real           */
+  BMS_SIM_OVERTEMP,       /**< limiar de OT acima da leitura real do NTC    */
+  BMS_SIM_OPEN_LOAD,      /**< diagnostico de open load com ladder resistivo */
+  BMS_SIM_COMM_LOSS,      /**< poe o TLE9012 em sleep: perda de comunicacao */
+  BMS_SIM_UNDERTEMP,      /**< limiar de UT abaixo da resistencia real      */
+  BMS_SIM_COUNT
+} bms_sim_fault_t;
+
+/* Margem entre a tensao medida e o limiar injetado. Precisa ser maior que a
+ * dispersao entre celulas para a falha pegar todas de uma vez. */
+#define BMS_SIM_MARGIN_MV   200u
 
 /* --- Temperatura --------------------------------------------------------- */
 
@@ -81,6 +178,40 @@
 #define BMS_NTC_R25_OHM     10000.0f
 #define BMS_NTC_BETA        3950.0f
 
+/**
+ * Limiar de SUBTEMPERATURA, em ohms do NTC.
+ *
+ * O TLE9012 NAO detecta subtemperatura -- ele so tem EXT_OT_THR, para o lado
+ * quente. Nao existe registrador de limiar frio. Portanto esta protecao e
+ * feita em FIRMWARE, comparando a resistencia medida.
+ *
+ * Como o NTC tem coeficiente negativo, mais frio significa MAIOR resistencia:
+ * a falha e temp.ohms > limiar.
+ *
+ * 25925 ohm = 5 C para um MF52A de 10 kohm com B = 3950. Recalcular se trocar
+ * de NTC -- este numero depende inteiramente de R25 e B.
+ *
+ * Por que 5 C importa: carregar celula de litio perto de 0 C causa
+ * lithium plating, que degrada de forma permanente e cria risco de curto
+ * interno. O limiar de carga costuma ser mais restritivo que o de descarga.
+ */
+#define BMS_UT_THR_OHM      25925uL
+
+/**
+ * Limite de confianca da compensacao de paralelo, em porcentagem de
+ * R_PARALLEL.
+ *
+ * A compensacao divide por (R_paralelo - R_medido). Quando os dois se
+ * aproximam, o denominador tende a zero e ruido de poucos ohms vira centenas
+ * de kohm. Acima deste percentual o resultado nao e confiavel e o canal e
+ * marcado invalido, em vez de reportar um numero inventado.
+ *
+ * 90% de 5197 = 4677 ohm, que corresponde a cerca de -5 C. Abaixo disso a
+ * medicao com resistor em paralelo nao serve mesmo -- a solucao e dessoldar
+ * o componente da placa, nao afrouxar este limite.
+ */
+#define BMS_TEMP_TRUST_PCT  90u
+
 /* Tentativas de polling do PCVM_START antes de desistir da conversao. Cada
  * tentativa custa uma leitura (~50 us) mais 100 us de espera, entao 100
  * tentativas dao ~15 ms de teto -- folga larga sobre o tempo real. */
@@ -100,51 +231,123 @@ DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
-/* Snapshot de medicao -- volatile e global para o Live Expressions conseguir
- * ler com o alvo rodando. E tambem a estrutura que as camadas de protecao e
- * de CAN vao consumir nas proximas fases. */
-volatile uint16_t cell_mv[BMS_NUM_CELLS];
-volatile uint16_t cell_min_mv;
-volatile uint16_t cell_max_mv;
-volatile uint16_t cell_delta_mv;
-volatile uint32_t meas_count;
-volatile uint32_t meas_fail_count;
-volatile uint8_t  last_status;      /* tle9012_status_t da ultima transacao */
-volatile uint8_t  chain_ready;
+/* ==========================================================================
+ * Estado agrupado
+ * ========================================================================== */
 
-/* Validade do snapshot. Sem isto, cell_mv congela no ultimo valor bom e nao
- * ha como distinguir "medicao atual" de "medicao de dez minutos atras" --
- * que num BMS e a diferenca entre proteger a bateria e achar que esta
- * protegendo. SEMPRE conferir cell_data_valid antes de usar cell_mv. */
-volatile uint8_t  cell_data_valid;
-volatile uint32_t cell_data_age_ms;
+/** Estado da cadeia e do smoke test. */
+typedef struct
+{
+  uint8_t  ready;           /**< 1 = cadeia inicializada e respondendo       */
+  uint8_t  smoke_ok;        /**< 1 = link validado de ponta a ponta          */
+  uint8_t  smoke_status;    /**< tle9012_status_t do readback                */
+  uint16_t smoke_config;    /**< valor lido do CONFIG (0x36)                 */
+  uint32_t smoke_attempts;  /**< tentativas de subir a cadeia                */
+  uint8_t  diag_status;     /**< tle9012_status_t da leitura do GEN_DIAG     */
+} bms_link_t;
 
-static uint32_t   s_last_good_tick;
-static uint8_t    s_consec_fail;
+/** Tensoes de celula. */
+typedef struct
+{
+  uint16_t cell_mv[BMS_NUM_CELLS];  /**< tensao de cada celula, em mV        */
+  uint16_t min_mv;
+  uint16_t max_mv;
+  uint16_t delta_mv;                /**< desbalanco: max - min               */
+  uint8_t  valid;                   /**< 0 = cell_mv e historico, nao medicao */
+  uint32_t age_ms;                  /**< ms desde a ultima medicao boa       */
+  uint32_t count;                   /**< ciclos bem-sucedidos                */
+  uint32_t fail_count;
+  uint8_t  status;                  /**< tle9012_status_t da ultima transacao */
+} bms_meas_t;
 
-/* Smoke test: resultado isolado do ciclo de medicao. Se smoke_ok == 1, o link
- * inteiro esta de pe -- baudrate, MSB first, CRC, eco e DMA. */
-volatile uint8_t  smoke_ok;
-volatile uint8_t  smoke_status;     /* tle9012_status_t do readback           */
-volatile uint16_t smoke_config;     /* valor lido do CONFIG (0x36)            */
-volatile uint32_t smoke_attempts;
+/** Temperaturas dos NTCs externos. */
+typedef struct
+{
+  uint32_t ohms[BMS_NUM_TEMP];      /**< NTC isolado -- use este nas protecoes */
+  uint32_t ohms_raw[BMS_NUM_TEMP];  /**< o que o ADC ve, com o paralelo da placa */
+  float    celsius[BMS_NUM_TEMP];   /**< so para leitura humana              */
+  uint8_t  valid[BMS_NUM_TEMP];
+  uint32_t count;
+  uint32_t fail_count;
+  uint8_t  status;
+} bms_temp_t;
 
-/* Diagnostico geral do TLE9012, lido a cada smoke test. Se a cadeia nao
- * sobe, este registrador diz se ha falha latcheada no dispositivo em vez de
- * problema de link. Ver secao 4.11 do manual para os bits. */
-volatile uint16_t gen_diag;
-volatile uint8_t  gen_diag_status;
+/**
+ * Falhas, limiares em vigor e historico.
+ *
+ * Os limiares moram aqui de proposito: numa demonstracao, mostrar o limiar ao
+ * lado da medicao e do veredito -- tudo numa expansao so -- e o que torna a
+ * prova convincente. Separa-los obrigaria a abrir tres expressoes.
+ */
+typedef struct
+{
+  /* --- Resumo --- */
+  bms_fault_code_t code;        /**< falha mais severa ativa, em texto       */
+  uint8_t          node;        /**< qual escravo da cadeia                  */
+  uint8_t          cell;        /**< primeira celula afetada, 0xFF se n/a    */
+  uint8_t          cell_count;  /**< quantas ao mesmo tempo                  */
 
-/* Temperatura. temp_ohms e o dado exato, em inteiro -- e o que as protecoes
- * devem usar. temp_c e conversao em float apenas para leitura humana no
- * depurador, e depende dos parametros do NTC estarem corretos. */
-volatile uint32_t temp_ohms_raw[BMS_NUM_TEMP];  /* o que o ADC ve (paralelo) */
-volatile uint32_t temp_ohms[BMS_NUM_TEMP];      /* NTC isolado, compensado   */
-volatile float    temp_c[BMS_NUM_TEMP];
-volatile uint8_t  temp_valid[BMS_NUM_TEMP];
-volatile uint32_t temp_count;
-volatile uint32_t temp_fail_count;
-volatile uint8_t  temp_status;
+  /* --- Mascaras apos histerese: e o que vale --- */
+  uint16_t uv;                  /**< bit i = celula i em subtensao           */
+  uint16_t ov;
+  uint8_t  ut;                  /**< bit z = canal z frio demais (firmware)  */
+
+  /* --- Cru do CI, latching --- */
+  uint16_t gen_diag;
+  uint16_t uv_raw;
+  uint16_t ov_raw;
+
+  /* --- Limiares em vigor --- */
+  uint16_t uv_thr_mv;
+  uint16_t ov_thr_mv;
+  uint16_t hyst_mv;
+  uint32_t ut_thr_ohm;
+  uint8_t  ut_enabled;          /**< 0 = protecao de frio desligada          */
+
+  /* --- Historico --- */
+  uint16_t latched;             /**< acumula desde o ultimo clear            */
+  uint32_t count;               /**< ciclos com alguma falha                 */
+  uint8_t  read_status;
+} bms_fault_t;
+
+/** Valores iniciais dos campos que nao comecam em zero. */
+#define BMS_FAULT_INIT { .node       = BMS_NODE_ID,     \
+                         .cell       = 0xFFu,           \
+                         .uv_thr_mv  = BMS_UV_THR_MV,   \
+                         .ov_thr_mv  = BMS_OV_THR_MV,   \
+                         .hyst_mv    = BMS_FAULT_HYST_MV, \
+                         .ut_thr_ohm = BMS_UT_THR_OHM,  \
+                         .ut_enabled = 0u }
+
+/** Injecao de falha para demonstracao. */
+typedef struct
+{
+  bms_sim_fault_t request;      /**< o que se quer injetar                   */
+  bms_sim_fault_t active;       /**< o que esta injetado                     */
+  uint8_t         apply_status;
+} bms_sim_t;
+
+/* Estado do BMS, agrupado em quatro structs.
+ *
+ * volatile e global de proposito: e assim que o Live Expressions le com o
+ * alvo rodando. Agrupar em struct significa uma expressao por assunto no
+ * depurador, em vez de vinte variaveis soltas -- e a expansao mostra tudo
+ * junto, o que importa quando alguem esta olhando por cima do ombro.
+ *
+ *   link   estado da cadeia e do smoke test
+ *   meas   tensoes de celula
+ *   temp   temperaturas
+ *   fault  falhas, limiares em vigor e historico
+ *   sim    injecao de falha para demonstracao
+ */
+volatile bms_link_t  link;
+volatile bms_meas_t  meas;
+volatile bms_temp_t  temp;
+volatile bms_fault_t fault = BMS_FAULT_INIT;
+volatile bms_sim_t   sim;
+
+static uint32_t s_last_good_tick;
+static uint8_t  s_consec_fail;
 
 /* USER CODE END PV */
 
@@ -174,8 +377,8 @@ static void MX_USART1_UART_Init(void);
  */
 static bool bms_smoke_test(void)
 {
-  smoke_attempts++;
-  smoke_ok = 0u;
+  link.smoke_attempts++;
+  link.smoke_ok = 0u;
 
   /* Devolve o IC a NODE_ID = 0 antes de tentar atribuir. Sem isto, um IC que
    * manteve o ID de uma sessao anterior nunca mais e alcancado: a atribuicao
@@ -189,15 +392,15 @@ static bool bms_smoke_test(void)
 
   if (st != TLE9012_OK)
   {
-    smoke_status = (uint8_t)st;
+    link.smoke_status = (uint8_t)st;
     return false;
   }
 
   uint16_t config = 0u;
   st = tle9012_read_reg(BMS_NODE_ID, TLE9012_REG_CONFIG, &config);
 
-  smoke_status = (uint8_t)st;
-  smoke_config = config;
+  link.smoke_status = (uint8_t)st;
+  link.smoke_config = config;
 
   if (st != TLE9012_OK)
   {
@@ -208,11 +411,11 @@ static bool bms_smoke_test(void)
    * distinguir falha latcheada no dispositivo de problema de link. */
   {
     uint16_t diag = 0u;
-    gen_diag_status = (uint8_t)tle9012_read_reg(BMS_NODE_ID,
+    link.diag_status = (uint8_t)tle9012_read_reg(BMS_NODE_ID,
                                                 TLE9012_REG_GEN_DIAG, &diag);
-    if (gen_diag_status == (uint8_t)TLE9012_OK)
+    if (link.diag_status == (uint8_t)TLE9012_OK)
     {
-      gen_diag = diag;
+      fault.gen_diag = diag;
 
       /* O manual (secao 3.6.2) exige limpar manualmente o PS_ERR_SLEEP, que
        * pode ficar setado apos o reset de registradores por sleep. */
@@ -229,7 +432,7 @@ static bool bms_smoke_test(void)
     return false;
   }
 
-  smoke_ok = 1u;
+  link.smoke_ok = 1u;
   return true;
 }
 
@@ -251,8 +454,11 @@ static bool bms_chain_init(void)
     return false;
   }
 
-  /* Ladder resistivo da placa de avaliacao dispara open load falso. */
-  if (tle9012_disable_open_load(BMS_NODE_ID) != TLE9012_OK)
+  /* Limiares de tensao e de open load moram nos mesmos dois registradores,
+   * entao sao escritos juntos. Open load em zero desativa o diagnostico, que
+   * e obrigatorio com o ladder resistivo. */
+  if (tle9012_set_thresholds(BMS_NODE_ID, BMS_UV_THR_MV, BMS_OV_THR_MV,
+                             BMS_OL_MIN_MV, BMS_OL_MAX_MV) != TLE9012_OK)
   {
     return false;
   }
@@ -322,12 +528,12 @@ static void bms_measure_cycle(void)
     st = tle9012_multiread_cells_mv(BMS_NODE_ID, mv, BMS_NUM_CELLS);
   }
 
-  last_status = (uint8_t)st;
+  meas.status = (uint8_t)st;
 
   if (st != TLE9012_OK)
   {
-    meas_fail_count++;
-    cell_data_valid = 0u;   /* cell_mv passa a ser historico, nao medicao */
+    meas.fail_count++;
+    meas.valid = 0u;   /* meas.cell_mv passa a ser historico, nao medicao */
 
     if (s_consec_fail < 0xFFu)
     {
@@ -339,7 +545,7 @@ static void bms_measure_cycle(void)
      * do TLE9012 resetar o NODE_ID. */
     if (s_consec_fail >= BMS_MAX_CONSEC_FAIL)
     {
-      chain_ready = 0u;
+      link.ready = 0u;
     }
 
     return;
@@ -352,26 +558,355 @@ static void bms_measure_cycle(void)
 
   for (uint8_t i = 0u; i < BMS_NUM_CELLS; i++)
   {
-    cell_mv[i] = mv[i];
+    meas.cell_mv[i] = mv[i];
 
     if (mv[i] < vmin) { vmin = mv[i]; }
     if (mv[i] > vmax) { vmax = mv[i]; }
   }
 
-  cell_min_mv   = vmin;
-  cell_max_mv   = vmax;
-  cell_delta_mv = (uint16_t)(vmax - vmin);
+  meas.min_mv   = vmin;
+  meas.max_mv   = vmax;
+  meas.delta_mv = (uint16_t)(vmax - vmin);
 
   s_last_good_tick = HAL_GetTick();
-  cell_data_age_ms = 0u;
-  cell_data_valid  = 1u;
-  meas_count++;
+  meas.age_ms = 0u;
+  meas.valid  = 1u;
+  meas.count++;
+}
+
+/** Indice do bit menos significativo setado, ou 0xFF se a mascara for zero. */
+static uint8_t first_bit(uint16_t mask)
+{
+  for (uint8_t i = 0u; i < 16u; i++)
+  {
+    if ((mask & (uint16_t)(1u << i)) != 0u)
+    {
+      return i;
+    }
+  }
+
+  return 0xFFu;
+}
+
+/** Quantos bits setados -- quantas celulas em falha ao mesmo tempo. */
+static uint8_t count_bits(uint16_t mask)
+{
+  uint8_t n = 0u;
+
+  while (mask != 0u)
+  {
+    mask &= (uint16_t)(mask - 1u);   /* limpa o bit menos significativo */
+    n++;
+  }
+
+  return n;
+}
+
+/**
+ * @brief Resolve a falha ativa mais severa em codigo simbolico.
+ *
+ * Ordem de prioridade, nao de ocorrencia: retorna a mais grave que estiver
+ * ativa neste instante.
+ */
+static void bms_resolve_fault_code(void)
+{
+  const uint16_t d = fault.gen_diag;
+
+  fault.cell       = 0xFFu;
+  fault.cell_count = 0u;
+
+  if (link.ready == 0u)          { fault.code = BMS_FAULT_CHAIN_DOWN;  return; }
+  if (meas.valid == 0u)      { fault.code = BMS_FAULT_DATA_STALE;  return; }
+
+  if (fault.ov != 0u)
+  {
+    fault.cell       = first_bit(fault.ov);
+    fault.cell_count = count_bits(fault.ov);
+    fault.code       = BMS_FAULT_CELL_OV;
+    return;
+  }
+
+  if (fault.uv != 0u)
+  {
+    fault.cell       = first_bit(fault.uv);
+    fault.cell_count = count_bits(fault.uv);
+    fault.code       = BMS_FAULT_CELL_UV;
+    return;
+  }
+
+  if ((d & TLE9012_DIAG_EXT_T_ERR) != 0u) { fault.code = BMS_FAULT_EXT_OVERTEMP; return; }
+  if ((d & TLE9012_DIAG_INT_OT) != 0u)    { fault.code = BMS_FAULT_INT_OVERTEMP; return; }
+
+  if (fault.ut != 0u)
+  {
+    fault.cell       = first_bit((uint16_t)fault.ut);
+    fault.cell_count = count_bits((uint16_t)fault.ut);
+    fault.code       = BMS_FAULT_UNDERTEMP;
+    return;
+  }
+
+  if ((d & TLE9012_DIAG_OL_ERR) != 0u)      { fault.code = BMS_FAULT_OPEN_LOAD;   return; }
+  if ((d & TLE9012_DIAG_ADC_ERR) != 0u)     { fault.code = BMS_FAULT_ADC;         return; }
+  if ((d & TLE9012_DIAG_INT_IC_ERR) != 0u)  { fault.code = BMS_FAULT_INTERNAL_IC; return; }
+  if ((d & TLE9012_DIAG_REG_CRC_ERR) != 0u) { fault.code = BMS_FAULT_REG_CRC;     return; }
+  if ((d & TLE9012_DIAG_PS_ERR_SLEEP) != 0u){ fault.code = BMS_FAULT_PS_SLEEP;    return; }
+
+  if ((d & (TLE9012_DIAG_BAL_ERR_UC | TLE9012_DIAG_BAL_ERR_OC)) != 0u)
+  {
+    fault.code = BMS_FAULT_BALANCING;
+    return;
+  }
+
+  fault.code = BMS_FAULT_NONE;
+}
+
+/**
+ * @brief Ha alguma condicao de falha ativa?
+ *
+ * Cobre tanto falha reportada pelo CI quanto perda de comunicacao e dado
+ * obsoleto -- nao saber a tensao e, para um AMS, tao grave quanto saber que
+ * ela esta errada.
+ */
+static bool bms_any_fault(void)
+{
+  if (link.ready == 0u)      { return true; }  /* cadeia caida             */
+  if (meas.valid == 0u)  { return true; }  /* medicao obsoleta         */
+  /* Usa a versao com histerese: e ela que define quando a falha realmente
+   * sai, nao o flag cru do CI. */
+  if (fault.uv != 0u)     { return true; }
+  if (fault.ov != 0u)     { return true; }
+  if (fault.ut != 0u)         { return true; }  /* subtemperatura, firmware */
+
+  return ((fault.gen_diag & TLE9012_DIAG_FAULT_MASK) != 0u);
+}
+
+/**
+ * @brief Aplica (ou remove) uma injecao de falha.
+ *
+ * Cada modo cria uma condicao fisica ou de configuracao que o TLE9012 detecta
+ * pelo caminho normal. Nada aqui escreve em flag de diagnostico.
+ */
+static void bms_apply_simulation(bms_sim_fault_t which)
+{
+  tle9012_status_t st = TLE9012_OK;
+
+  switch (which)
+  {
+    case BMS_SIM_UNDERVOLTAGE:
+      /* Limiar de UV acima da tensao medida: as celulas passam a estar
+       * legitimamente abaixo do limite configurado. */
+      fault.uv_thr_mv = (uint16_t)(meas.max_mv + BMS_SIM_MARGIN_MV);
+      fault.ov_thr_mv = BMS_OV_THR_MV;
+
+      st = tle9012_set_thresholds(BMS_NODE_ID, fault.uv_thr_mv, fault.ov_thr_mv,
+                                  BMS_OL_MIN_MV, BMS_OL_MAX_MV);
+      break;
+
+    case BMS_SIM_OVERVOLTAGE:
+      /* Limiar de OV abaixo da tensao medida. Guarda contra underflow. */
+      if (meas.min_mv > (BMS_SIM_MARGIN_MV + BMS_UV_THR_MV))
+      {
+        fault.uv_thr_mv = BMS_UV_THR_MV;
+        fault.ov_thr_mv = (uint16_t)(meas.min_mv - BMS_SIM_MARGIN_MV);
+
+        st = tle9012_set_thresholds(BMS_NODE_ID, fault.uv_thr_mv, fault.ov_thr_mv,
+                                    BMS_OL_MIN_MV, BMS_OL_MAX_MV);
+      }
+      else
+      {
+        st = TLE9012_ERR_PARAM;   /* tensao baixa demais para injetar OV */
+      }
+      break;
+
+    case BMS_SIM_OVERTEMP:
+      /* OT dispara quando o resultado fica ABAIXO do limiar, porque a
+       * resistencia do NTC cai com o calor. Limiar no maximo faz qualquer
+       * leitura disparar. */
+      st = tle9012_config_temp(BMS_NODE_ID, BMS_NUM_TEMP, BMS_TEMP_INTC,
+                               TLE9012_TEMP_CONF_OT_MASK);
+      break;
+
+    case BMS_SIM_OPEN_LOAD:
+      /* Reabilita o diagnostico de open load. Com o ladder resistivo ele
+       * dispara de verdade, porque a resistencia do divisor e muito maior
+       * que a interna de uma celula -- exatamente o que o manual descreve. */
+      st = tle9012_set_thresholds(BMS_NODE_ID, BMS_UV_THR_MV, BMS_OV_THR_MV,
+                                  60u, 220u);
+      break;
+
+    case BMS_SIM_UNDERTEMP:
+      /* Limiar de UT abaixo da resistencia medida: o NTC passa a estar
+       * legitimamente "mais frio" que o limite configurado. A comparacao e
+       * a mesma da protecao real -- so o limiar mudou.
+       *
+       * Nota honesta: diferente dos outros modos, este exercita apenas a
+       * deteccao em FIRMWARE, porque o TLE9012 nao tem protecao de
+       * subtemperatura. Nao ha caminho de hardware para demonstrar aqui. */
+      if ((temp.valid[0] != 0u) && (temp.ohms[0] > 100u))
+      {
+        fault.ut_enabled = 1u;
+        fault.ut_thr_ohm = temp.ohms[0] / 2u;
+      }
+      else
+      {
+        /* Sem termistor conectado nao ha o que injetar: o canal esta
+         * invalido e a protecao nao tem entrada. */
+        st = TLE9012_ERR_PARAM;
+      }
+      break;
+
+    case BMS_SIM_COMM_LOSS:
+      /* Manda o CI dormir. A comunicacao cai de fato, o NODE_ID reseta, e a
+       * recuperacao automatica e exercitada junto. */
+      st = tle9012_write_reg(BMS_NODE_ID, TLE9012_REG_OP_MODE, 0xC401u);
+      break;
+
+    case BMS_SIM_NONE:
+    default:
+      /* Restaura a configuracao normal. */
+      fault.uv_thr_mv = BMS_UV_THR_MV;
+      fault.ov_thr_mv = BMS_OV_THR_MV;
+
+      st = tle9012_set_thresholds(BMS_NODE_ID, fault.uv_thr_mv, fault.ov_thr_mv,
+                                  BMS_OL_MIN_MV, BMS_OL_MAX_MV);
+      if (st == TLE9012_OK)
+      {
+        st = tle9012_config_temp(BMS_NODE_ID, BMS_NUM_TEMP,
+                                 BMS_TEMP_INTC, BMS_TEMP_OT_THR);
+      }
+      if (st == TLE9012_OK)
+      {
+        st = tle9012_clear_faults(BMS_NODE_ID);
+        fault.latched = 0u;
+      }
+      fault.ut_thr_ohm   = BMS_UT_THR_OHM;   /* desfaz injecao de subtemperatura */
+      fault.ut_enabled   = 0u;               /* volta desligada: sem termistor   */
+      fault.ut     = 0u;
+      fault.uv = 0u;               /* sai do estado latcheado          */
+      fault.ov = 0u;
+      break;
+  }
+
+  sim.apply_status = (uint8_t)st;
+  sim.active       = which;
+}
+
+/** Botao azul da Nucleo: avanca para o proximo modo de simulacao. */
+void BSP_PB_Callback(Button_TypeDef Button)
+{
+  if (Button == BUTTON_USER)
+  {
+    sim.request = (bms_sim_fault_t)(((uint8_t)sim.request + 1u)
+                                    % (uint8_t)BMS_SIM_COUNT);
+  }
+}
+
+/**
+ * @brief Le o estado de falha do dispositivo.
+ *
+ * Nao limpa nada: limpar falha e decisao de quem trata, nao de quem le. O
+ * acumulador fault.latched existe porque uma falha momentanea pode sumir do
+ * GEN_DIAG antes de alguem olhar -- perder isso num BMS e inaceitavel.
+ */
+static void bms_fault_cycle(void)
+{
+  tle9012_faults_t f;
+
+  const tle9012_status_t st = tle9012_read_faults(BMS_NODE_ID, &f);
+  fault.read_status = (uint8_t)st;
+
+  if (st != TLE9012_OK)
+  {
+    return;
+  }
+
+  fault.gen_diag = f.gen_diag;
+  fault.uv_raw   = f.cell_uv;
+  fault.ov_raw   = f.cell_ov;
+
+  /* Seta imediatamente: deteccao nunca e atrasada pela histerese. */
+  fault.uv |= f.cell_uv;
+  fault.ov |= f.cell_ov;
+
+  /* Limpa so com margem, e so com medicao valida. Dado obsoleto nunca pode
+   * justificar sair de um estado de falha. */
+  if (meas.valid != 0u)
+  {
+    uint16_t clear_uv = 0u;
+    uint16_t clear_ov = 0u;
+
+    for (uint8_t i = 0u; i < BMS_NUM_CELLS; i++)
+    {
+      const uint16_t bit = (uint16_t)(1u << i);
+      const uint16_t mv  = meas.cell_mv[i];
+
+      if (((fault.uv & bit) != 0u) &&
+          (mv > (uint16_t)(fault.uv_thr_mv + BMS_FAULT_HYST_MV)))
+      {
+        clear_uv |= bit;
+      }
+
+      if (((fault.ov & bit) != 0u) &&
+          (fault.ov_thr_mv > BMS_FAULT_HYST_MV) &&
+          (mv < (uint16_t)(fault.ov_thr_mv - BMS_FAULT_HYST_MV)))
+      {
+        clear_ov |= bit;
+      }
+    }
+
+    if ((clear_uv != 0u) || (clear_ov != 0u))
+    {
+      /* Limpa tambem no CI: o flag e latching, entao sem isto ele
+       * reapareceria na proxima leitura e a histerese nao teria efeito. */
+      if (tle9012_clear_cell_flags(BMS_NODE_ID, clear_uv, clear_ov)
+          == TLE9012_OK)
+      {
+        fault.uv &= (uint16_t)~clear_uv;
+        fault.ov &= (uint16_t)~clear_ov;
+      }
+    }
+
+    /* CELL_UV e CELL_OV do GEN_DIAG sao bits-RESUMO, em registrador
+     * separado dos flags por celula. Limpar os detalhados nao limpa o
+     * resumo -- sem isto o GEN_DIAG fica preso na falha antiga.
+     *
+     * Sao do tipo rocwl: escrever '0' limpa o bit e reseta o registrador
+     * detalhado associado, que a esta altura ja esta vazio. */
+    uint16_t diag_clear = 0u;
+
+    if ((fault.uv == 0u) && ((fault.gen_diag & TLE9012_DIAG_CELL_UV) != 0u))
+    {
+      diag_clear |= TLE9012_DIAG_CELL_UV;
+    }
+
+    if ((fault.ov == 0u) && ((fault.gen_diag & TLE9012_DIAG_CELL_OV) != 0u))
+    {
+      diag_clear |= TLE9012_DIAG_CELL_OV;
+    }
+
+    if (diag_clear != 0u)
+    {
+      /* '1' preserva os demais bits; '0' so nas posicoes a limpar. */
+      (void)tle9012_write_reg(BMS_NODE_ID, TLE9012_REG_GEN_DIAG,
+                              (uint16_t)~diag_clear);
+    }
+  }
+
+  /* Bits 0 a 4 do GEN_DIAG sao status de operacao, nao erro -- nao entram
+   * no acumulador para nao poluir com "round robin ativo" e afins. */
+  fault.latched |= (uint16_t)(f.gen_diag & TLE9012_DIAG_FAULT_MASK);
+
+  if (((f.gen_diag & TLE9012_DIAG_FAULT_MASK) != 0u) ||
+      (f.cell_uv != 0u) || (f.cell_ov != 0u))
+  {
+    fault.count++;
+  }
 }
 
 /**
  * @brief Le os NTCs externos e converte para resistencia.
  *
- * Nao afeta chain_ready: falha de temperatura nao derruba a cadeia, so
+ * Nao afeta link.ready: falha de temperatura nao derruba a cadeia, so
  * invalida os canais. A tensao continua sendo o dado critico.
  */
 static void bms_temp_cycle(void)
@@ -380,15 +915,15 @@ static void bms_temp_cycle(void)
 
   const tle9012_status_t st = tle9012_read_temp_raw(BMS_NODE_ID, raw,
                                                     BMS_NUM_TEMP);
-  temp_status = (uint8_t)st;
+  temp.status = (uint8_t)st;
 
   if (st != TLE9012_OK)
   {
-    temp_fail_count++;
+    temp.fail_count++;
 
     for (uint8_t z = 0u; z < BMS_NUM_TEMP; z++)
     {
-      temp_valid[z] = 0u;
+      temp.valid[z] = 0u;
     }
 
     return;
@@ -400,7 +935,7 @@ static void bms_temp_cycle(void)
      * produziu resultado novo para este canal desde a leitura anterior. */
     if (!raw[z].valid)
     {
-      temp_valid[z] = 0u;
+      temp.valid[z] = 0u;
       continue;
     }
 
@@ -408,20 +943,44 @@ static void bms_temp_cycle(void)
                                                        BMS_TEMP_R_SERIES);
 
     /* O que o ADC ve: NTC externo em paralelo com o componente da placa. */
-    temp_ohms_raw[z] = measured;
+    temp.ohms_raw[z] = measured;
+
+    /* Guarda de confiabilidade: perto de R_PARALLEL o denominador da
+     * compensacao tende a zero e o resultado deixa de ter significado. */
+    const uint32_t trust_limit =
+        ((uint32_t)BMS_TEMP_R_PARALLEL * BMS_TEMP_TRUST_PCT) / 100uL;
+
+    if (measured >= trust_limit)
+    {
+      /* Tipicamente: nenhum NTC externo conectado neste canal. */
+      temp.valid[z] = 0u;
+      fault.ut &= (uint8_t)~(1u << z);
+      continue;
+    }
 
     const uint32_t ohms = tle9012_compensate_parallel(measured,
                                                       BMS_TEMP_R_PARALLEL);
 
     if (ohms == 0u)
     {
-      /* Compensacao impossivel: sem NTC externo, ou R_PARALLEL errado. */
-      temp_valid[z] = 0u;
+      temp.valid[z] = 0u;
+      fault.ut &= (uint8_t)~(1u << z);
       continue;
     }
 
-    temp_ohms[z]  = ohms;
-    temp_valid[z] = 1u;
+    temp.ohms[z]  = ohms;
+    temp.valid[z] = 1u;
+
+    /* Subtemperatura em firmware: NTC tem coeficiente negativo, entao mais
+     * frio = maior resistencia. */
+    if ((fault.ut_enabled != 0u) && (ohms > fault.ut_thr_ohm))
+    {
+      fault.ut |= (uint8_t)(1u << z);
+    }
+    else
+    {
+      fault.ut &= (uint8_t)~(1u << z);
+    }
 
     /* Equacao de Beta, so para leitura humana. Protecao deve comparar em
      * ohms, sem passar por logaritmo. */
@@ -431,11 +990,11 @@ static void bms_temp_cycle(void)
           1.0f / ((1.0f / 298.15f)
                   + (logf((float)ohms / BMS_NTC_R25_OHM) / BMS_NTC_BETA));
 
-      temp_c[z] = t_kelvin - 273.15f;
+      temp.celsius[z] = t_kelvin - 273.15f;
     }
   }
 
-  temp_count++;
+  temp.count++;
 }
 
 /**
@@ -494,7 +1053,7 @@ int main(void)
   tle9012_port_inhibit_sleep();
   tle9012_wakeup();
 
-  chain_ready = bms_chain_init() ? 1u : 0u;
+  link.ready = bms_chain_init() ? 1u : 0u;
   /* USER CODE END 2 */
 
   /* Initialize led */
@@ -523,20 +1082,21 @@ int main(void)
     /* USER CODE BEGIN 3 */
     /* Idade do snapshot, atualizada sempre -- inclusive enquanto a cadeia
      * esta caida, que e justamente quando ela importa. */
-    cell_data_age_ms = HAL_GetTick() - s_last_good_tick;
+    meas.age_ms = HAL_GetTick() - s_last_good_tick;
 
-    if (chain_ready == 0u)
+    if (link.ready == 0u)
     {
       /* Cadeia caida ou ainda nao inicializada: tenta de novo em vez de
        * travar. Inspecionar tp_dbg_avail_on_timeout, depois tle_dbg_rx. */
-      cell_data_valid = 0u;
+      meas.valid = 0u;
+      BSP_LED_On(LED_GREEN);   /* cadeia caida tambem e falha */
 
       HAL_Delay(500u);
       tle9012_wakeup();
 
       if (bms_chain_init())
       {
-        chain_ready   = 1u;
+        link.ready   = 1u;
         s_consec_fail = 0u;
       }
 
@@ -545,13 +1105,37 @@ int main(void)
 
     bms_measure_cycle();
 
+    /* Falhas a cada ciclo: e o dado de seguranca, nao pode ficar atrasado. */
+    bms_fault_cycle();
+
     /* Temperatura em cadencia mais lenta que a tensao. */
-    if ((meas_count % BMS_TEMP_EVERY_N) == 0u)
+    if ((meas.count % BMS_TEMP_EVERY_N) == 0u)
     {
       bms_temp_cycle();
     }
 
-    BSP_LED_Toggle(LED_GREEN);
+    /* Injecao de falha pedida pelo botao ou pelo depurador. */
+    if (sim.request != sim.active)
+    {
+      bms_apply_simulation(sim.request);
+    }
+
+    bms_resolve_fault_code();
+
+    /* LD2 aceso FIXO = falha. Piscando = vivo e saudavel.
+     *
+     * Piscar como sinal de saude e proposital: LED apagado passa a significar
+     * firmware travado, e nao "tudo bem". Um AMS nao pode ter estado de falha
+     * indistinguivel de estado morto. */
+    if (bms_any_fault())
+    {
+      BSP_LED_On(LED_GREEN);
+    }
+    else
+    {
+      BSP_LED_Toggle(LED_GREEN);
+    }
+
     HAL_Delay(BMS_MEAS_PERIOD_MS);
   }
   /* USER CODE END 3 */
