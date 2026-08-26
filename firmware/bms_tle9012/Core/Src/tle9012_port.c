@@ -7,10 +7,10 @@
 
 #include <stddef.h>
 
-/* Potencia de 2: permite usar mascara em vez de divisao no ring buffer.
- * 64 bytes cobrem com folga a maior transacao (9 bytes) mesmo com lixo
- * acumulado de uma transacao anterior malsucedida. */
-#define RX_RING_SIZE   64u
+/* Potencia de 2: permite usar mascara em vez de divisao no ring buffer. */
+/* 128 em vez de 64 para caber a rajada do multiread: 12 celulas sao 24 bytes
+ * de dado, mais eco, cabecalho e CRC. Potencia de 2 e obrigatorio (mascara). */
+#define RX_RING_SIZE   128u
 #define RX_RING_MASK   (RX_RING_SIZE - 1u)
 
 /* Timeout de uma transacao. A 2 Mbit/s, 9 bytes levam ~45 us; 10 ms e folga

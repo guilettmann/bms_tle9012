@@ -242,6 +242,163 @@ tle9012_status_t tle9012_start_measurement(uint8_t node_id)
                            TLE9012_MEAS_CTRL_PCVM_16BIT);
 }
 
+tle9012_status_t tle9012_wait_measurement(uint8_t node_id, uint16_t max_polls)
+{
+  for (uint16_t i = 0u; i < max_polls; i++)
+  {
+    uint16_t ctrl = 0u;
+    const tle9012_status_t st = tle9012_read_reg(node_id,
+                                                 TLE9012_REG_MEAS_CTRL, &ctrl);
+    if (st != TLE9012_OK)
+    {
+      return st;
+    }
+
+    if ((ctrl & TLE9012_MEAS_CTRL_PCVM_START) == 0u)
+    {
+      return TLE9012_OK;   /* hardware limpou o bit: conversao concluida */
+    }
+
+    if (s_tp->delay_us != NULL)
+    {
+      s_tp->delay_us(100u);
+    }
+  }
+
+  return TLE9012_ERR_TIMEOUT;
+}
+
+/* --- Multiread ----------------------------------------------------------- */
+
+volatile uint8_t  tle_mr_raw[TLE9012_MULTIREAD_MAX_BYTES];
+volatile uint16_t tle_mr_len;
+
+tle9012_status_t tle9012_multiread_configure(uint16_t cfg)
+{
+  /* Broadcast e obrigatorio para este registrador (secao 4.37). */
+  return tle9012_write_reg(TLE9012_BROADCAST_ID,
+                           TLE9012_REG_MULTI_READ_CFG, cfg);
+}
+
+tle9012_status_t tle9012_multiread_probe(uint8_t node_id)
+{
+  if ((s_tp == NULL) || (s_tp->send == NULL) || (s_tp->drain == NULL))
+  {
+    return TLE9012_ERR_PARAM;
+  }
+
+  uint8_t tx[FRAME_LEN_READ];
+
+  tx[0] = TLE9012_SYNC;
+  tx[1] = (uint8_t)(node_id & 0x3Fu);
+  tx[2] = TLE9012_REG_MULTI_READ;
+  tx[3] = crc8_j1850(tx, 3u);
+
+  s_tp->flush();
+
+  if (!s_tp->send(tx, FRAME_LEN_READ))
+  {
+    tle_mr_len = 0u;
+    return TLE9012_ERR_TRANSPORT;
+  }
+
+  /* Sem saber o tamanho da rajada, espera um tempo generoso e drena tudo.
+   * A 2 Mbit/s, 96 bytes levam ~480 us; 10 ms cobre qualquer atraso interno
+   * do dispositivo em montar a resposta. Melhor esperar demais numa sonda de
+   * diagnostico do que truncar a rajada e medir o proprio timeout. */
+  if (s_tp->delay_us != NULL)
+  {
+    s_tp->delay_us(10000u);
+  }
+
+  uint8_t buf[TLE9012_MULTIREAD_MAX_BYTES];
+  const uint16_t n = s_tp->drain(buf, (uint16_t)sizeof(buf));
+
+  for (uint16_t i = 0u; i < n; i++)
+  {
+    tle_mr_raw[i] = buf[i];
+  }
+
+  tle_mr_len = n;
+
+  /* Mais que o proprio eco significa que algo foi devolvido. */
+  return (n > FRAME_LEN_READ) ? TLE9012_OK : TLE9012_ERR_TIMEOUT;
+}
+
+/* Layout de cada registro da rajada de multiread, determinado em bancada:
+ * o mesmo frame de 5 bytes da resposta de leitura simples. */
+#define MR_FRAME_LEN     5u
+#define MR_FRAME_DATA_H  2u
+#define MR_FRAME_DATA_L  3u
+#define MR_FRAME_CRC     4u
+
+tle9012_status_t tle9012_multiread_cells_mv(uint8_t node_id,
+                                            uint16_t *mv, uint8_t n_cells)
+{
+  if ((mv == NULL) || (n_cells == 0u) || (n_cells > TLE9012_MAX_CELLS) ||
+      (s_tp == NULL) || (s_tp->send == NULL) || (s_tp->recv == NULL))
+  {
+    return TLE9012_ERR_PARAM;
+  }
+
+  uint8_t tx[FRAME_LEN_READ];
+  uint8_t rx[FRAME_LEN_READ + (TLE9012_MAX_CELLS * MR_FRAME_LEN)];
+
+  tx[0] = TLE9012_SYNC;
+  tx[1] = (uint8_t)(node_id & 0x3Fu);
+  tx[2] = TLE9012_REG_MULTI_READ;
+  tx[3] = crc8_j1850(tx, 3u);
+
+  const uint16_t expected =
+      (uint16_t)(FRAME_LEN_READ + ((uint16_t)n_cells * MR_FRAME_LEN));
+
+  s_tp->flush();
+
+  if (!s_tp->send(tx, FRAME_LEN_READ))
+  {
+    dbg_capture(tx, FRAME_LEN_READ, rx, 0u, TLE9012_ERR_TRANSPORT);
+    return TLE9012_ERR_TRANSPORT;
+  }
+
+  if (!s_tp->recv(rx, expected, s_tp->timeout_ms))
+  {
+    const uint16_t got = (s_tp->drain != NULL)
+                       ? s_tp->drain(rx, expected) : 0u;
+
+    dbg_capture(tx, FRAME_LEN_READ, rx, got, TLE9012_ERR_TIMEOUT);
+    return TLE9012_ERR_TIMEOUT;
+  }
+
+  /* Valida os 12 CRCs antes de aceitar qualquer valor: se todos fecham, o
+   * passo de 5 bytes esta correto e a rajada foi interpretada certo. */
+  for (uint8_t i = 0u; i < n_cells; i++)
+  {
+    const uint8_t *f = &rx[FRAME_LEN_READ + ((uint16_t)i * MR_FRAME_LEN)];
+
+    if (crc8_j1850(f, 4u) != f[MR_FRAME_CRC])
+    {
+      dbg_capture(tx, FRAME_LEN_READ, rx, expected, TLE9012_ERR_CRC);
+      return TLE9012_ERR_CRC;
+    }
+  }
+
+  for (uint8_t i = 0u; i < n_cells; i++)
+  {
+    const uint8_t *f = &rx[FRAME_LEN_READ + ((uint16_t)i * MR_FRAME_LEN)];
+
+    const uint16_t val = (uint16_t)(((uint16_t)f[MR_FRAME_DATA_H] << 8)
+                                  |  (uint16_t)f[MR_FRAME_DATA_L]);
+
+    /* PCVM_SEL = 0xC entrega "Cell 11-0": ordem decrescente. */
+    const uint8_t cell = (uint8_t)(n_cells - 1u - i);
+
+    mv[cell] = tle9012_raw_to_mv(val);
+  }
+
+  dbg_capture(tx, FRAME_LEN_READ, rx, expected, TLE9012_OK);
+  return TLE9012_OK;
+}
+
 uint16_t tle9012_raw_to_mv(uint16_t raw)
 {
   /* V[mV] = (FSR / 2^16) * raw, em inteiro para evitar float. */

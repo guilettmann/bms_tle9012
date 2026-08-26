@@ -101,6 +101,65 @@ tle9012_status_t tle9012_kick_watchdog(uint8_t node_id);
 tle9012_status_t tle9012_start_measurement(uint8_t node_id);
 
 /**
+ * @brief Aguarda o fim da conversao fazendo polling do bit PCVM_START.
+ *
+ * O hardware limpa PCVM_START (MEAS_CTRL bit 15) quando termina, o que
+ * dispensa esperar um tempo fixo arbitrario: a leitura sai assim que fica
+ * pronta e um atraso maior que o esperado vira erro em vez de dado invalido.
+ *
+ * @param max_polls  numero maximo de leituras antes de desistir.
+ */
+tle9012_status_t tle9012_wait_measurement(uint8_t node_id, uint16_t max_polls);
+
+/* --- Multiread ----------------------------------------------------------- */
+
+/* 96 porque a primeira sonda saturou em 48. Hipoteses para o tamanho real:
+ * 12 respostas de 5 bytes (SYNC ID DH DL CRC) + 4 de eco = 64, ou 12 de 4
+ * bytes + eco = 52. Ambas cabem aqui. */
+#define TLE9012_MULTIREAD_MAX_BYTES 96u
+
+/** Resposta crua da ultima sonda de multiread, para inspecao no depurador. */
+extern volatile uint8_t  tle_mr_raw[TLE9012_MULTIREAD_MAX_BYTES];
+extern volatile uint16_t tle_mr_len;
+
+/**
+ * @brief Configura o que entra na rajada de multiread.
+ * @note  O manual (secao 4.37) exige que este registrador seja escrito por
+ *        comando de BROADCAST, nao enderecado a um no especifico.
+ */
+tle9012_status_t tle9012_multiread_configure(uint16_t cfg);
+
+/**
+ * @brief Dispara um multiread e captura a resposta crua em tle_mr_raw.
+ *
+ * O formato do frame de resposta do multiread NAO esta documentado no user
+ * manual -- ele descreve os registradores mas nao o arranjo dos bytes que
+ * voltam. Esta funcao existe para observar a rajada real em bancada e so
+ * entao escrever o parser, em vez de adivinhar o layout.
+ */
+tle9012_status_t tle9012_multiread_probe(uint8_t node_id);
+
+/**
+ * @brief Le todas as tensoes de celula numa unica transacao (multiread).
+ *
+ * Substitui as 12 transacoes de tle9012_read_cells_mv() por uma so. Exige
+ * que tle9012_multiread_configure() tenha sido chamado antes.
+ *
+ * Formato da rajada, determinado em bancada (nao documentado no manual):
+ * 4 bytes de eco seguidos de @p n_cells frames de 5 bytes, cada um no mesmo
+ * layout da resposta de leitura simples -- SYNC, ID, DATA_H, DATA_L, CRC8,
+ * com o CRC cobrindo os 4 bytes anteriores. Total de 64 bytes para 12 celulas.
+ *
+ * @note A ORDEM das celulas na rajada segue o campo PCVM_SEL do manual, que
+ *       descreve 0xC como "Result of Cell 11-0" -- ou seja, decrescente, da
+ *       celula 11 para a 0. Isso NAO pode ser verificado com o ladder
+ *       resistivo, onde todas as celulas leem igual. Confirmar com fonte
+ *       desbalanceada ou celulas reais antes de confiar na ordem.
+ */
+tle9012_status_t tle9012_multiread_cells_mv(uint8_t node_id,
+                                            uint16_t *mv, uint8_t n_cells);
+
+/**
  * @brief Le as tensoes de celula ja convertidas para milivolts.
  * @param mv       vetor de saida com @p n_cells posicoes.
  * @note  Chamar tle9012_start_measurement() e aguardar a conversao antes.

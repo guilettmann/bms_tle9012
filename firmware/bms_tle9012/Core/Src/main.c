@@ -42,11 +42,10 @@
  * glitch pontual de um link que caiu. */
 #define BMS_MAX_CONSEC_FAIL 3u
 
-/* Tempo de conversao do PCVM em 16 bits. Valor conservador para o bring-up:
- * o bit PCVM_START limpa sozinho ao terminar, entao o caminho correto e
- * fazer polling do MEAS_CTRL -- fica para quando a posicao do bit estiver
- * confirmada no manual (secao 4.23). */
-#define BMS_CONV_WAIT_MS   5u
+/* Tentativas de polling do PCVM_START antes de desistir da conversao. Cada
+ * tentativa custa uma leitura (~50 us) mais 100 us de espera, entao 100
+ * tentativas dao ~15 ms de teto -- folga larga sobre o tempo real. */
+#define BMS_CONV_MAX_POLLS 100u
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -90,6 +89,7 @@ volatile uint8_t  smoke_ok;
 volatile uint8_t  smoke_status;     /* tle9012_status_t do readback           */
 volatile uint16_t smoke_config;     /* valor lido do CONFIG (0x36)            */
 volatile uint32_t smoke_attempts;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -181,6 +181,13 @@ static bool bms_chain_init(void)
     return false;
   }
 
+  /* Rajada de multiread com as 12 celulas. Broadcast e exigido pelo manual
+   * para este registrador (secao 4.37). */
+  if (tle9012_multiread_configure(TLE9012_MULTIREAD_CFG_ALL_CELLS) != TLE9012_OK)
+  {
+    return false;
+  }
+
   /* Confirma lendo de volta -- o manual recomenda validar toda escrita de
    * configuracao relendo o registrador (secao 3.1.2). */
   uint16_t readback = 0u;
@@ -208,10 +215,18 @@ static void bms_measure_cycle(void)
     st = tle9012_start_measurement(BMS_NODE_ID);
   }
 
+  /* Espera o hardware limpar PCVM_START, em vez de um atraso fixo chutado:
+   * a leitura sai assim que fica pronta, e uma conversao que nao conclui
+   * vira erro explicito em vez de dado lido cedo demais. */
   if (st == TLE9012_OK)
   {
-    HAL_Delay(BMS_CONV_WAIT_MS);
-    st = tle9012_read_cells_mv(BMS_NODE_ID, mv, BMS_NUM_CELLS);
+    st = tle9012_wait_measurement(BMS_NODE_ID, BMS_CONV_MAX_POLLS);
+  }
+
+  /* Multiread: uma transacao de 64 bytes no lugar de doze de 9. */
+  if (st == TLE9012_OK)
+  {
+    st = tle9012_multiread_cells_mv(BMS_NODE_ID, mv, BMS_NUM_CELLS);
   }
 
   last_status = (uint8_t)st;

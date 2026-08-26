@@ -55,6 +55,20 @@
 /** MEAS_CTRL: PCVM_START = 1, CVM_MODE = 110b (16 bits). Tabela 19. */
 #define TLE9012_MEAS_CTRL_PCVM_16BIT  0xE021u
 
+/**
+ * Bit PCVM_START do MEAS_CTRL (secao 4.23, bit 15, tipo rwh).
+ * O hardware limpa este bit quando a conversao termina -- e por isso que da
+ * para fazer polling em vez de esperar um tempo fixo chutado.
+ */
+#define TLE9012_MEAS_CTRL_PCVM_START  0x8000u
+
+/**
+ * MULTI_READ_CFG.PCVM_SEL = 0xC (RES_CELL_11_0): traz o resultado das 12
+ * celulas, da 11 a 0, numa unica transacao (secao 4.37).
+ * Valores 0xD a 0xF nao produzem resultado de PCVM.
+ */
+#define TLE9012_MULTIREAD_CFG_ALL_CELLS  0x000Cu
+
 /** Bit FN (Final Node) no campo de dados do CONFIG. Tabela 10: 0x0804 = FN + ID 4. */
 #define TLE9012_CONFIG_FINAL_NODE     0x0800u
 
