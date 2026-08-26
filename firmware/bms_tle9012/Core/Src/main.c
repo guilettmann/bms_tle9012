@@ -37,6 +37,11 @@
 #define BMS_NUM_CELLS      12u
 #define BMS_MEAS_PERIOD_MS 100u
 
+/* Falhas consecutivas ate declarar a cadeia caida e reinicializar. Tres
+ * ciclos = 300 ms sem leitura valida, tempo de sobra para distinguir um
+ * glitch pontual de um link que caiu. */
+#define BMS_MAX_CONSEC_FAIL 3u
+
 /* Tempo de conversao do PCVM em 16 bits. Valor conservador para o bring-up:
  * o bit PCVM_START limpa sozinho ao terminar, entao o caminho correto e
  * fazer polling do MEAS_CTRL -- fica para quando a posicao do bit estiver
@@ -68,6 +73,16 @@ volatile uint32_t meas_count;
 volatile uint32_t meas_fail_count;
 volatile uint8_t  last_status;      /* tle9012_status_t da ultima transacao */
 volatile uint8_t  chain_ready;
+
+/* Validade do snapshot. Sem isto, cell_mv congela no ultimo valor bom e nao
+ * ha como distinguir "medicao atual" de "medicao de dez minutos atras" --
+ * que num BMS e a diferenca entre proteger a bateria e achar que esta
+ * protegendo. SEMPRE conferir cell_data_valid antes de usar cell_mv. */
+volatile uint8_t  cell_data_valid;
+volatile uint32_t cell_data_age_ms;
+
+static uint32_t   s_last_good_tick;
+static uint8_t    s_consec_fail;
 
 /* Smoke test: resultado isolado do ciclo de medicao. Se smoke_ok == 1, o link
  * inteiro esta de pe -- baudrate, MSB first, CRC, eco e DMA. */
@@ -188,8 +203,25 @@ static void bms_measure_cycle(void)
   if (st != TLE9012_OK)
   {
     meas_fail_count++;
+    cell_data_valid = 0u;   /* cell_mv passa a ser historico, nao medicao */
+
+    if (s_consec_fail < 0xFFu)
+    {
+      s_consec_fail++;
+    }
+
+    /* Link caido: volta ao smoke test em vez de insistir para sempre num
+     * canal morto. Cobre o caso de a CSC perder alimentacao ou o watchdog
+     * do TLE9012 resetar o NODE_ID. */
+    if (s_consec_fail >= BMS_MAX_CONSEC_FAIL)
+    {
+      chain_ready = 0u;
+    }
+
     return;
   }
+
+  s_consec_fail = 0u;
 
   uint16_t vmin = 0xFFFFu;
   uint16_t vmax = 0u;
@@ -205,6 +237,10 @@ static void bms_measure_cycle(void)
   cell_min_mv   = vmin;
   cell_max_mv   = vmax;
   cell_delta_mv = (uint16_t)(vmax - vmin);
+
+  s_last_good_tick = HAL_GetTick();
+  cell_data_age_ms = 0u;
+  cell_data_valid  = 1u;
   meas_count++;
 }
 
@@ -291,13 +327,25 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    /* Idade do snapshot, atualizada sempre -- inclusive enquanto a cadeia
+     * esta caida, que e justamente quando ela importa. */
+    cell_data_age_ms = HAL_GetTick() - s_last_good_tick;
+
     if (chain_ready == 0u)
     {
-      /* Cadeia nao subiu: tenta de novo em vez de travar. Inspecionar
-       * tp_dbg_avail_on_timeout primeiro, depois tle_dbg_rx / smoke_status. */
+      /* Cadeia caida ou ainda nao inicializada: tenta de novo em vez de
+       * travar. Inspecionar tp_dbg_avail_on_timeout, depois tle_dbg_rx. */
+      cell_data_valid = 0u;
+
       HAL_Delay(500u);
       tle9012_wakeup();
-      chain_ready = bms_chain_init() ? 1u : 0u;
+
+      if (bms_chain_init())
+      {
+        chain_ready   = 1u;
+        s_consec_fail = 0u;
+      }
+
       continue;
     }
 
