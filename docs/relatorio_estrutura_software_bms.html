@@ -120,7 +120,7 @@
   </div>
   <div class="meta">
     Documento T&eacute;cnico<br>
-    Rev. 1.5<br>
+    Rev. 1.6<br>
     2026-08-25
   </div>
 </div>
@@ -172,6 +172,10 @@
         <li><a href="#s104">Histerese</a></li>
         <li><a href="#s105">Inje&ccedil;&atilde;o de falha</a></li>
         <li><a href="#s106">Sinaliza&ccedil;&atilde;o no LD2</a></li>
+        <li><a href="#s107">Medi&ccedil;&atilde;o de temperatura</a></li>
+        <li><a href="#s108">Prote&ccedil;&otilde;es de temperatura</a></li>
+        <li><a href="#s109">Shutdown circuit</a></li>
+        <li><a href="#s1010">Estado agrupado em structs</a></li>
       </ol>
     </li>
     <li><a href="#s9">Refer&ecirc;ncias</a>
@@ -255,7 +259,7 @@
 </thead>
 <tbody>
   <tr><td class="num">1</td><td>Driver TLE9012 &mdash; ler as 12 tens&otilde;es via UART</td><td class="id">0x0800 0000</td><td>ST-LINK (SWD)</td></tr>
-  <tr><td class="num">2</td><td>Prote&ccedil;&otilde;es, temperatura, balanceamento</td><td class="id">0x0800 0000</td><td>ST-LINK (SWD)</td></tr>
+  <tr><td class="num">2</td><td>Prote&ccedil;&otilde;es e temperatura &mdash; falta balanceamento</td><td class="id">0x0800 0000</td><td>ST-LINK (SWD)</td></tr>
   <tr><td class="num">3</td><td>Tabela de par&acirc;metros em flash + CAN da aplica&ccedil;&atilde;o</td><td class="id">0x0800 0000</td><td>ST-LINK (SWD)</td></tr>
   <tr><td class="num">4</td><td>Bootloader CAN</td><td class="id">0x0800 4000</td><td>ST-LINK <em>ou</em> CAN</td></tr>
 </tbody>
@@ -1142,6 +1146,197 @@ Um AMS n&atilde;o pode ter estado de falha confund&iacute;vel com estado morto.<
 <p>A condi&ccedil;&atilde;o de acender cobre mais que os flags do CI: <strong>cadeia ca&iacute;da</strong> e
 <strong>dado obsoleto</strong> tamb&eacute;m acendem. Para um AMS, n&atilde;o saber a tens&atilde;o &eacute; t&atilde;o
 grave quanto saber que ela est&aacute; errada.</p>
+
+<h3 id="s107">10.7 Medi&ccedil;&atilde;o de temperatura</h3>
+
+<p>A temperatura n&atilde;o &eacute; disparada como a tens&atilde;o. Ela &eacute; medida pelo
+<strong>round robin</strong>, at&eacute; duas por ciclo (se&ccedil;&atilde;o 3.2.4 do manual). O firmware liga o
+round robin ao watchdog via <code>RR_CONFIG.RR_SYNC</code>: cada escrita no <code>WD_CNT</code>
+reinicia o RR, e como o watchdog j&aacute; &eacute; realimentado a cada 100 ms, o kick virou o agendador
+da temperatura sem custar um timer.</p>
+
+<p>A convers&atilde;o para ohms usa a f&oacute;rmula da se&ccedil;&atilde;o 3.4.2 em aritm&eacute;tica inteira exata:
+o fator <code>2 V / (2<sup>10</sup> &times; 320 &micro;A)</code> vale precisamente
+<code>25000/4096</code>, o que permite multiplica&ccedil;&atilde;o e deslocamento sem float e sem erro
+de arredondamento.</p>
+
+<div class="regra">
+  <div class="rot">A placa de avalia&ccedil;&atilde;o tem componentes nas posi&ccedil;&otilde;es NTC0..NTC4</div>
+  Medidos em bancada: <strong>~5,2 k&Omega; nos cinco canais</strong>, com dispers&atilde;o de 1,9%.
+  Um NTC externo fica em <strong>paralelo</strong> com eles, e a leitura resultante n&atilde;o &eacute; a
+  do sensor: um NTC de 10 k&Omega; lia 3,5 k&Omega;.
+  <p>O firmware compensa com
+  <code>R_ntc = (R_med &times; R_par) / (R_par &minus; R_med)</code>, mas isso &eacute;
+  <strong>paliativo</strong>. O denominador tende a zero conforme os dois se aproximam, e o erro
+  &eacute; amplificado justamente no frio &mdash; a 5 C o fator de amplifica&ccedil;&atilde;o j&aacute; &eacute; ~6&times;.
+  Uma guarda marca o canal como inv&aacute;lido acima de 90% de <code>R_PARALLEL</code>, em vez de
+  publicar n&uacute;mero sem significado. <strong>Dessoldar o componente da placa d&aacute; leitura limpa
+  e &eacute; sempre melhor.</strong></p>
+</div>
+
+<div class="aviso">
+  <div class="rot">Configurar s&oacute; os canais realmente ligados</div>
+  <code>NR_TEMP_SENSE</code> ativa uma <strong>sequ&ecirc;ncia</strong> a partir do TMP0, n&atilde;o canais
+  avulsos. Ativar canais sem NTC faz o teste de mux falhar neles, o que seta <code>PD_ERR</code> &mdash;
+  e <code>PD_ERR</code> est&aacute; ligado ao <code>EXT_T_ERR</code> do <code>GEN_DIAG</code>.
+  A constante <code>BMS_NUM_TEMP_USED</code> precisa bater com o hardware.
+</div>
+
+<h3 id="s108">10.8 Prote&ccedil;&otilde;es de temperatura</h3>
+
+<table>
+<thead>
+  <tr><td>Prote&ccedil;&atilde;o</td><td>Onde &eacute; detectada</td><td>Comparada contra</td></tr>
+</thead>
+<tbody>
+  <tr><td>Sobretemperatura</td><td><strong>Hardware</strong> (TLE9012)</td><td><code>RESULT</code> do ADC</td></tr>
+  <tr><td>Subtemperatura</td><td><strong>Firmware</strong> &mdash; o CI n&atilde;o possui</td><td>resist&ecirc;ncia em ohms</td></tr>
+  <tr><td>Fio aberto / curto</td><td><strong>Hardware</strong></td><td>&mdash;</td></tr>
+</tbody>
+</table>
+
+<p>N&atilde;o existe registrador de limiar frio no TLE9012: h&aacute; apenas <code>EXT_OT_THR</code>, para o
+lado quente. A subtemperatura roda no MCU, e por isso &eacute; estruturalmente mais fraca &mdash; depende
+do firmware estar vivo.</p>
+
+<div class="regra">
+  <div class="rot">A armadilha que custou mais tempo: I_NTC n&atilde;o &eacute; INTC</div>
+  S&atilde;o dois campos com nomes parecidos e pap&eacute;is diferentes:
+  <table>
+    <thead><tr><td>Campo</td><td>Onde</td><td>O que &eacute;</td></tr></thead>
+    <tbody>
+      <tr><td><code>TEMP_CONF.I_NTC</code></td><td>escrito</td><td>fonte usada na <strong>compara&ccedil;&atilde;o de OT</strong></td></tr>
+      <tr><td><code>EXT_TEMP_z.INTC</code></td><td>lido</td><td>fonte usada na <strong>medi&ccedil;&atilde;o</strong></td></tr>
+    </tbody>
+  </table>
+  <p>O <code>RESULT</code> escala por <strong>4 a cada n&iacute;vel</strong>. Configurar
+  <code>I_NTC = 1</code> com a medi&ccedil;&atilde;o rodando em <code>INTC = 0</code> faz a compara&ccedil;&atilde;o
+  acontecer contra um valor 4&times; menor que o reportado &mdash; e a sobretemperatura disparou com o
+  NTC a 24 C. <strong>Os dois t&ecirc;m que usar a mesma fonte.</strong></p>
+  <p>Diagnosticado lendo <code>EXT_TEMP_0 = 0x2244</code>: <code>VALID=1</code>,
+  <code>PD_ERR=0</code>, <code>INTC=0</code>, <code>RESULT=580</code>. Antes disso, tr&ecirc;s
+  hip&oacute;teses erradas foram testadas &mdash; a li&ccedil;&atilde;o de m&eacute;todo &eacute; ler o registrador cru
+  antes de teorizar sobre o mecanismo.</p>
+</div>
+
+<h4>Limiares</h4>
+
+<p>O <code>EXT_OT_THR</code> &eacute; comparado contra o <code>RESULT</code> bruto, n&atilde;o contra ohms
+nem graus, e dispara quando o resultado fica <strong>abaixo</strong> do limiar &mdash; porque a
+resist&ecirc;ncia do NTC cai com o calor.</p>
+
+<table>
+<thead>
+  <tr><td>Temperatura</td><td><code>RESULT</code> (INTC = 0)</td></tr>
+</thead>
+<tbody>
+  <tr><td class="num">45 C</td><td class="num">404</td></tr>
+  <tr><td class="num">50 C</td><td class="num">364</td></tr>
+  <tr class="destaque"><td class="num">55 C</td><td class="num">327 &mdash; retorno</td></tr>
+  <tr class="destaque"><td class="num">60 C</td><td class="num">292 &mdash; disparo</td></tr>
+  <tr><td class="num">65 C</td><td class="num">260</td></tr>
+  <tr><td class="num">70 C</td><td class="num">232</td></tr>
+</tbody>
+</table>
+
+<p><strong>Histerese de 5 C:</strong> dispara em <code>RESULT &lt; 292</code>, s&oacute; retorna em
+<code>RESULT &gt; 327</code>. Como o flag do CI &eacute; latching, o firmware tamb&eacute;m o limpa no
+dispositivo &mdash; sem isso ele reapareceria na leitura seguinte e a histerese n&atilde;o teria efeito.</p>
+
+<p>A struct espelha os limiares em <strong>graus</strong> (<code>ot_thr_c</code>,
+<code>ot_clear_c</code>, <code>ut_thr_c</code>), recalculados a cada ciclo com a fonte de corrente
+em uso &mdash; ent&atilde;o acompanham a inje&ccedil;&atilde;o de falha. Limiar e medi&ccedil;&atilde;o ficam na mesma
+unidade, lado a lado, que &eacute; o que torna uma demonstra&ccedil;&atilde;o leg&iacute;vel.</p>
+
+<h4>Diagn&oacute;stico de fio</h4>
+
+<p>O <code>EXT_TEMP_DIAG</code> (0x0E) traz <strong>tr&ecirc;s bits por canal</strong>, n&atilde;o um:
+<code>OPEN</code>, <code>SHORT</code> e <code>OT</code>, nas posi&ccedil;&otilde;es <code>3z</code>,
+<code>3z+1</code> e <code>3z+2</code>. Aberto e curto <strong>n&atilde;o</strong> levam histerese:
+s&atilde;o falha de fia&ccedil;&atilde;o, n&atilde;o grandeza anal&oacute;gica oscilando em torno de um limiar.</p>
+
+<h3 id="s109">10.9 Shutdown circuit</h3>
+
+<p>Um GPIO comanda o MOSFET que abre e fecha o shutdown circuit do ve&iacute;culo.</p>
+
+<div class="regra">
+  <div class="rot">Polaridade &mdash; o estado seguro tem que ser o estado n&atilde;o energizado</div>
+  <strong>N&iacute;vel ALTO fecha o circuito, BAIXO abre.</strong> Com pull-down externo no gate, MCU
+  desligado, em reset ou com o pino em alta imped&acirc;ncia deixa o circuito <strong>aberto</strong>.
+  A polaridade inversa produziria um sistema em que MCU morto = ve&iacute;culo liberado sem prote&ccedil;&atilde;o.
+  <p>O pull-down externo n&atilde;o &eacute; opcional: sem ele, o pino flutuante durante o reset pode
+  fechar o MOSFET por acaso. O firmware escreve n&iacute;vel baixo <em>antes</em> de configurar o pino
+  como sa&iacute;da, para n&atilde;o haver instante em alto durante o boot.</p>
+</div>
+
+<p><strong>O shutdown trava aberto.</strong> Uma vez aberto por falha, n&atilde;o fecha sozinho quando a
+condi&ccedil;&atilde;o some &mdash; recupera&ccedil;&atilde;o autom&aacute;tica deixaria o ve&iacute;culo se reenergizar ap&oacute;s
+um transiente. Destravar exige a&ccedil;&atilde;o expl&iacute;cita, e o pedido &eacute; <strong>ignorado se ainda
+houver falha</strong>, nunca enfileirado. No ve&iacute;culo isso deve ser um bot&atilde;o f&iacute;sico.</p>
+
+<div class="aviso">
+  <div class="rot">Limita&ccedil;&atilde;o do acionamento por n&iacute;vel est&aacute;tico</div>
+  N&iacute;vel est&aacute;tico <strong>n&atilde;o cobre travamento do MCU</strong>: um firmware travado continua
+  segurando o pino em alto e o circuito permanece fechado. A prote&ccedil;&atilde;o passa a depender do
+  supervisor estar vivo.
+  <p>O firmware traz a alternativa <code>BMS_SHUTDOWN_TOGGLE</code>: o pino vira <strong>onda
+  quadrada</strong> enquanto tudo est&aacute; ok, e um diodo com RC no gate mant&eacute;m o MOSFET conduzindo
+  s&oacute; enquanto houver pulsos. Se pararem &mdash; por travamento, reset ou perda de alimenta&ccedil;&atilde;o
+  &mdash; o RC descarrega e o circuito abre sozinho. Para um AMS de competi&ccedil;&atilde;o, &eacute; a forma
+  correta: cobre a falha do pr&oacute;prio supervisor.</p>
+</div>
+
+<p>Todas as falhas foram habilitadas a disparar EMM pelo <code>FAULT_MASK = 0xFFC0</code> (bits 6 a
+15 setados, <code>ERR_PIN = 0</code> mantendo o EMM ativo). O EMM sobe pela iso UART at&eacute; o
+TLE9015, que aciona <code>ERRQ</code> e <code>ERR_loc_out</code> &mdash; caminho de prote&ccedil;&atilde;o em
+hardware, independente do firmware.</p>
+
+<h3 id="s1010">10.10 Estado agrupado em structs</h3>
+
+<p>Todo o estado de runtime foi reorganizado em seis structs <code>volatile</code>. O motivo &eacute;
+pr&aacute;tico: no Live Expressions vira <strong>uma express&atilde;o por assunto</strong> em vez de trinta
+vari&aacute;veis soltas, e a expans&atilde;o mostra tudo junto.</p>
+
+<table>
+<thead>
+  <tr><td>Struct</td><td>Conte&uacute;do</td></tr>
+</thead>
+<tbody>
+  <tr><td class="id">link</td><td>Estado da cadeia e do smoke test</td></tr>
+  <tr><td class="id">meas</td><td>Tens&otilde;es de c&eacute;lula, extremos, validade e idade</td></tr>
+  <tr><td class="id">temp</td><td>Temperaturas, valores crus e diagn&oacute;stico</td></tr>
+  <tr class="destaque"><td class="id">fault</td><td>Falhas, m&aacute;scaras, <strong>limiares em vigor</strong> e hist&oacute;rico</td></tr>
+  <tr><td class="id">sim</td><td>Inje&ccedil;&atilde;o de falha</td></tr>
+  <tr><td class="id">shutdown</td><td>Estado do circuito, causa e travamento</td></tr>
+</tbody>
+</table>
+
+<p>Os limiares moram dentro de <code>fault</code> de prop&oacute;sito: mostrar limiar, medi&ccedil;&atilde;o e
+veredito numa expans&atilde;o s&oacute; &eacute; o que torna a prova convincente numa inspe&ccedil;&atilde;o. Separados,
+seria preciso abrir tr&ecirc;s express&otilde;es e pedir ao avaliador que correlacione.</p>
+
+<p>Vari&aacute;veis de tipo <code>enum</code> &mdash; <code>fault.code</code>, <code>sim.active</code>,
+<code>shutdown.cause</code> &mdash; aparecem pelo <strong>nome</strong> no depurador, n&atilde;o pelo
+n&uacute;mero.</p>
+
+<div class="nota">
+  <div class="rot">Comandos dispon&iacute;veis pelo depurador</div>
+  <code>fault.clear_request = 1</code> limpa falhas latcheadas no dispositivo &mdash; necess&aacute;rio
+  porque a inicializa&ccedil;&atilde;o s&oacute; roda com a cadeia ca&iacute;da, e uma falha que trave depois dela
+  ficaria latcheada para sempre.<br>
+  <code>shutdown.reset_request = 1</code> destrava o shutdown.<br>
+  <code>sim.request = N</code> injeta falha; o bot&atilde;o azul cicla os modos sem depurador.<br>
+  <code>fault.ut_enabled = 1</code> liga a prote&ccedil;&atilde;o de subtemperatura, desligada por padr&atilde;o
+  enquanto n&atilde;o houver termistor.
+</div>
+
+<div class="nota">
+  <div class="rot">Nota &mdash; falhas de partida</div>
+  As primeiras convers&otilde;es ap&oacute;s habilitar a temperatura acontecem antes das fontes de corrente
+  e dos filtros RC assentarem, e sinalizam erro que n&atilde;o corresponde a condi&ccedil;&atilde;o real. A
+  inicializa&ccedil;&atilde;o aguarda cinco ciclos de round robin (500 ms, realimentando o watchdog) e s&oacute;
+  ent&atilde;o limpa &mdash; separando ru&iacute;do de partida de falha de verdade.
+</div>
 
 <h2 id="s9">11. Refer&ecirc;ncias</h2>
 <ol class="refs">
