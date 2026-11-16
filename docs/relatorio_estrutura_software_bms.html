@@ -3,1395 +3,1009 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BMS TLE9012 — Estrutura de Software</title>
-<!-- Rev 1.1: MCU alterado de STM32G474RET6 para STM32G491RET6 (NUCLEO-G491RE) -->
-
+<title>BMS AMPERA — Como o projeto foi feito</title>
 <style>
   :root{
-    --azul:#407E93;
-    --azul-esc:#2F5F70;
-    --ciano:#4FC3D6;
-    --texto:#373435;
-    --cinza:#849196;
-    --linha:#DDE3E6;
-    --fundo-sut:#F4F7F8;
-    --ok:#3E8E5A;
-    --alerta:#B3721E;
-    --risco:#A6413B;
+    --azul:#407E93; --azul-esc:#2F5F70; --ciano:#4FC3D6; --texto:#373435; --cinza:#849196;
+    --linha:#DDE3E6; --fundo-sut:#F4F7F8; --ok:#3E8E5A; --alerta:#B3721E; --risco:#A6413B;
   }
   *{box-sizing:border-box;}
-  body{
-    margin:0; padding:0; background:#EBEFF1; color:var(--texto);
-    font-family:"Segoe UI",-apple-system,Roboto,Helvetica,Arial,sans-serif;
-    font-size:10.5pt; line-height:1.55;
-  }
+  body{margin:0; padding:0; background:#EBEFF1; color:var(--texto);
+    font-family:"Segoe UI",-apple-system,Roboto,Helvetica,Arial,sans-serif; font-size:10.5pt; line-height:1.6;}
   .pagina{max-width:840px; margin:24px auto; background:#fff; box-shadow:0 2px 14px rgba(0,0,0,.10);}
-
-  /* ---------- Cabecalho ---------- */
-  .topo{padding:26px 44px 18px;}
-  .topo img{width:220px; height:auto; display:block;}
-  .faixa{
-    background:var(--azul); color:#fff; padding:16px 44px 18px;
-    display:flex; justify-content:space-between; align-items:flex-end; gap:24px;
-  }
+  .topo{padding:26px 44px 18px;} .topo img{width:220px; height:auto; display:block;}
+  .faixa{background:var(--azul); color:#fff; padding:16px 44px 18px; display:flex; justify-content:space-between; align-items:flex-end; gap:24px;}
   .faixa h1{margin:0; font-size:19pt; font-weight:700; letter-spacing:.2px;}
   .faixa .sub{margin:4px 0 0; font-size:9.5pt; opacity:.92;}
   .faixa .meta{text-align:right; font-size:8.5pt; line-height:1.5; opacity:.95; white-space:nowrap;}
   .identificacao{padding:12px 44px; border-bottom:1px solid var(--linha); font-size:8.5pt; color:var(--cinza);}
   .identificacao strong{color:var(--texto);}
-
-  /* ---------- Conteudo ---------- */
   main{padding:8px 44px 40px;}
-  h2{
-    font-size:12pt; color:var(--azul); margin:34px 0 4px; padding-bottom:5px;
-    border-bottom:1.5px solid var(--azul); text-transform:uppercase; letter-spacing:.6px;
-  }
-  h3{font-size:10.8pt; margin:22px 0 6px; color:var(--azul-esc);}
-  h4{font-size:9.8pt; margin:16px 0 4px; color:var(--texto);}
+  h2{font-size:12pt; color:var(--azul); margin:34px 0 6px; padding-bottom:5px; border-bottom:1.5px solid var(--azul); text-transform:uppercase; letter-spacing:.6px; break-after:avoid;}
+  h3{font-size:10.8pt; margin:22px 0 6px; color:var(--azul-esc); break-after:avoid;}
   p{margin:9px 0;} ul,ol{margin:9px 0; padding-left:22px;} li{margin:4px 0;}
-  code{
-    font-family:Consolas,"Courier New",monospace; font-size:9.3pt;
-    background:var(--fundo-sut); padding:1px 5px; border-radius:3px;
-    border:1px solid var(--linha); color:var(--azul-esc);
-  }
+  code{font-family:Consolas,"Courier New",monospace; font-size:9.2pt; background:var(--fundo-sut); padding:1px 5px; border-radius:3px; border:1px solid var(--linha); color:var(--azul-esc);}
   .rot{font-size:7.5pt; text-transform:uppercase; letter-spacing:.8px; color:var(--cinza);}
-
-  /* ---------- Indice ---------- */
+  .cit{font-size:8pt; color:var(--cinza); white-space:nowrap;}
   .indice{background:var(--fundo-sut); border:1px solid var(--linha); padding:16px 22px; margin:18px 0 6px;}
-  .indice .rot{margin-bottom:8px;}
-  .indice ol{margin:0; padding-left:20px; font-size:9.2pt;}
-  .indice > ol > li{margin:5px 0;}
-  .indice ol ol{padding-left:18px; margin:2px 0; color:var(--cinza);}
-  .indice a{color:var(--texto); text-decoration:none;}
-
-  /* ---------- Caixas ---------- */
-  .decisao{border:1.5px solid var(--azul); border-left:5px solid var(--azul); background:var(--fundo-sut); padding:16px 20px; margin:16px 0 6px;}
-  .decisao .peca{font-size:15pt; font-weight:700; color:var(--azul); font-family:Consolas,monospace;}
-  .decisao p{margin:8px 0 0; font-size:9.8pt;}
-  .aviso{border-left:4px solid var(--alerta); background:#FCF7EE; padding:12px 16px; margin:14px 0; font-size:9.3pt;}
+  .indice .rot{margin-bottom:8px;} .indice ol{margin:0; padding-left:20px; font-size:9.2pt; columns:2; column-gap:28px;}
+  .indice li{margin:3px 0; break-inside:avoid;} .indice a{color:var(--texto); text-decoration:none;}
+  .decisao{border:1.5px solid var(--azul); border-left:5px solid var(--azul); background:var(--fundo-sut); padding:14px 18px; margin:14px 0;}
+  .decisao .peca{font-size:13pt; font-weight:700; color:var(--azul);}
+  .decisao p{margin:6px 0 0; font-size:9.8pt;}
+  .aviso{border-left:4px solid var(--alerta); background:#FCF7EE; padding:12px 16px; margin:14px 0; font-size:9.6pt; break-inside:avoid;}
   .aviso .rot{color:var(--alerta); margin-bottom:3px;}
-  .nota{border-left:4px solid var(--cinza); background:var(--fundo-sut); padding:12px 16px; margin:14px 0; font-size:9.3pt; color:#4A5458;}
+  .nota{border-left:4px solid var(--cinza); background:var(--fundo-sut); padding:12px 16px; margin:14px 0; font-size:9.6pt; color:#4A5458; break-inside:avoid;}
   .nota .rot{margin-bottom:3px;}
-  .regra{border-left:4px solid var(--risco); background:#FDF5F4; padding:12px 16px; margin:14px 0; font-size:9.3pt;}
+  .regra{border-left:4px solid var(--risco); background:#FDF5F4; padding:12px 16px; margin:14px 0; font-size:9.6pt; break-inside:avoid;}
   .regra .rot{color:var(--risco); margin-bottom:3px;}
-
-  /* ---------- Tabelas ---------- */
   table{width:100%; border-collapse:collapse; margin:12px 0; font-size:9pt;}
+  thead{display:table-header-group;}
   thead td{background:var(--azul); color:#fff; font-weight:600; padding:7px 9px; font-size:8pt; text-transform:uppercase; letter-spacing:.5px;}
-  tbody td{padding:7px 9px; border-bottom:1px solid var(--linha); vertical-align:top;}
+  tbody td{padding:6px 9px; border-bottom:1px solid var(--linha); vertical-align:top;}
+  tbody tr{break-inside:avoid;}
   tbody tr:nth-child(even){background:#FAFCFC;}
   .destaque td{background:#E8F1F4 !important; font-weight:600;}
-  .sim{color:var(--ok); font-weight:600;}
-  .nao{color:var(--risco); font-weight:600;}
+  .sim{color:var(--ok); font-weight:600;} .nao{color:var(--risco); font-weight:600;} .talvez{color:var(--alerta); font-weight:600;}
   td.num{text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap;}
   td.id{font-family:Consolas,monospace; font-weight:600; color:var(--azul-esc); white-space:nowrap;}
-
-  /* ---------- Diagrama ---------- */
-  .arq{
-    background:var(--fundo-sut); border:1px solid var(--linha); padding:14px 18px; margin:12px 0;
-    font-family:Consolas,"Courier New",monospace; font-size:8.6pt; line-height:1.7;
-    white-space:pre; overflow-x:auto; color:var(--azul-esc);
-  }
-
-  /* ---------- Referências ---------- */
-  .refs{margin:18px 0;}
+  .arq{background:var(--fundo-sut); border:1px solid var(--linha); padding:14px 18px; margin:12px 0; font-family:Consolas,"Courier New",monospace; font-size:8.6pt; line-height:1.6; white-space:pre; overflow-x:auto; color:var(--azul-esc); break-inside:avoid;}
   .refs li{margin:5px 0;}
   footer{border-top:1px solid var(--linha); margin:0 44px; padding:14px 0 26px; font-size:7.8pt; color:var(--cinza); text-align:center;}
-
   @page{ size:A4; margin:12mm 0; }
   @media print{
     *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
     .topo,.faixa,.identificacao,main{ padding-left:14mm; padding-right:14mm; }
     footer{ margin-left:14mm; margin-right:14mm; }
-    body{background:#fff;}
-    .pagina{box-shadow:none; margin:0; max-width:none;}
+    body{background:#fff;} .pagina{box-shadow:none; margin:0; max-width:none;}
   }
 </style>
 </head>
 <body>
 <div class="pagina">
 
-<!-- ========== CABECALHO ========== -->
 <div class="topo"><img src="logo_ampera.png" alt="AMPERA"></div>
 <div class="faixa">
   <div>
-    <h1>Estrutura de Software &mdash; BMS</h1>
-    <div class="sub">Battery Management System com TLE9012DQU + TLE9015DQU + STM32G491RET6</div>
+    <h1>BMS AMPERA &mdash; como o projeto foi feito</h1>
+    <div class="sub">Battery Management System com TLE9012DQU, TLE9015DQU e STM32G491</div>
   </div>
-  <div class="meta">
-    Documento T&eacute;cnico<br>
-    Rev. 1.6<br>
-    2026-08-25
-  </div>
+  <div class="meta">Documento técnico<br>Rev. 2.0<br>2026-11-09</div>
 </div>
 <div class="identificacao">
-  <strong>Equipe:</strong> AMPERA &nbsp;&bull;&nbsp;
-  <strong>Autor:</strong> Guilherme Lettmann
+  <strong>Equipe:</strong> AMPERA &nbsp;&bull;&nbsp; <strong>Autor:</strong> Guilherme Lettmann &nbsp;&bull;&nbsp;
+  <strong>Regulamento:</strong> Formula SAE Rules 2027, Version 1.0
 </div>
 
-<!-- ========== SUMARIO ========== -->
 <main>
 <div class="indice">
-  <div class="rot">Sum&aacute;rio</div>
+  <div class="rot">Sumário</div>
   <ol>
-    <li><a href="#s1">Vis&atilde;o Geral da Arquitetura</a>
-      <ol>
-        <li><a href="#s1">Hardware de Desenvolvimento</a></li>
-        <li><a href="#s1">Fases de Implementa&ccedil;&atilde;o</a></li>
-      </ol>
-    </li>
-    <li><a href="#s2">Mapa de Mem&oacute;ria Flash</a></li>
-    <li><a href="#s3">Bootloader CAN</a></li>
-    <li><a href="#s4">Tabela de Par&acirc;metros</a></li>
-    <li><a href="#s5">Firmware de Aplica&ccedil;&atilde;o</a>
-      <ol>
-        <li><a href="#s51">M&oacute;dulos</a></li>
-        <li><a href="#s52">M&aacute;quina de Estados</a></li>
-      </ol>
-    </li>
-    <li><a href="#s6">Driver TLE9012 / TLE9015</a>
-      <ol>
-        <li><a href="#s61">Protocolo iso UART</a></li>
-        <li><a href="#s62">Estrutura do Frame</a></li>
-        <li><a href="#s63">CRC SAE-J1850</a></li>
-        <li><a href="#s64">Sequ&ecirc;ncia de Inicializa&ccedil;&atilde;o</a></li>
-        <li><a href="#s65">Leitura de Tens&otilde;es</a></li>
-        <li><a href="#s66">Leitura de Temperatura</a></li>
-        <li><a href="#s67">Portabilidade &mdash; Isolamento do Transporte</a></li>
-        <li><a href="#s68">Configura&ccedil;&atilde;o do Perif&eacute;rico no STM32CubeMX</a></li>
-      </ol>
-    </li>
-    <li><a href="#s7">Estrutura de Diret&oacute;rios do Projeto</a></li>
-    <li><a href="#s8">Fluxo de Atualiza&ccedil;&atilde;o em Campo</a></li>
-    <li><a href="#s9b">Valida&ccedil;&atilde;o em Bancada</a></li>
-    <li><a href="#s10">Diagn&oacute;stico e Prote&ccedil;&otilde;es</a>
-      <ol>
-        <li><a href="#s101">C&oacute;digo de falha</a></li>
-        <li><a href="#s102">Bits do GEN_DIAG</a></li>
-        <li><a href="#s103">M&aacute;scaras por c&eacute;lula</a></li>
-        <li><a href="#s104">Histerese</a></li>
-        <li><a href="#s105">Inje&ccedil;&atilde;o de falha</a></li>
-        <li><a href="#s106">Sinaliza&ccedil;&atilde;o no LD2</a></li>
-        <li><a href="#s107">Medi&ccedil;&atilde;o de temperatura</a></li>
-        <li><a href="#s108">Prote&ccedil;&otilde;es de temperatura</a></li>
-        <li><a href="#s109">Shutdown circuit</a></li>
-        <li><a href="#s1010">Estado agrupado em structs</a></li>
-      </ol>
-    </li>
-    <li><a href="#s9">Refer&ecirc;ncias</a>
-      <ol>
-        <li><a href="#s9">Uso da Biblioteca de Refer&ecirc;ncia</a></li>
-      </ol>
-    </li>
+    <li><a href="#s1">Sobre este documento</a></li>
+    <li><a href="#s2">O sistema</a></li>
+    <li><a href="#s3">Por que esses componentes</a></li>
+    <li><a href="#s4">Como organizei o trabalho</a></li>
+    <li><a href="#s5">Montagem da bancada</a></li>
+    <li><a href="#s6">Comunicação com o TLE9012</a></li>
+    <li><a href="#s7">Leitura das tensões</a></li>
+    <li><a href="#s8">Leitura das temperaturas</a></li>
+    <li><a href="#s9">Proteções</a></li>
+    <li><a href="#s10">Shutdown e sinalização</a></li>
+    <li><a href="#s11">Como mostro que funciona</a></li>
+    <li><a href="#s12">Problemas que encontrei</a></li>
+    <li><a href="#s13">Requisitos</a></li>
+    <li><a href="#sHW">Placa slave: ligação do TLE9012</a></li>
+    <li><a href="#s14">Próximos passos</a></li>
+    <li><a href="#s15">Registro de decisões</a></li>
+    <li><a href="#s16">Rastreabilidade</a></li>
+    <li><a href="#s17">Referências</a></li>
+    <li style="list-style:none; margin-left:-16px;"><a href="#sA">A. Apêndice &mdash; configuração do CubeMX</a></li>
   </ol>
 </div>
 
-<!-- ========== 1. VISAO GERAL ========== -->
-<h2 id="s1">1. Vis&atilde;o Geral da Arquitetura</h2>
+<!-- ===================================================== 1 -->
+<h2 id="s1">1. Sobre este documento</h2>
 
-<p>O software do BMS &eacute; dividido em tr&ecirc;s camadas independentes, armazenadas em regi&otilde;es distintas da flash do STM32G491RET6:</p>
+<p>Aqui eu conto como desenvolvi o BMS da AMPERA: o que foi feito, em que ordem e por que tomei cada
+decisão. A ideia é que qualquer pessoa da equipe consiga ler do começo ao fim e entender o sistema sem
+abrir o código. O detalhe de cada registrador fica no código e no manual da Infineon; aqui fica o
+raciocínio.</p>
 
-<div class="arq">
-+------------------------------------------------------+
-|                   STM32G491RET6                      |
-|                                                      |
-|  +----------------+  +----------------------------+  |
-|  |   BOOTLOADER   |  |   TABELA DE PARAMETROS     |  |
-|  |   (CAN bus)    |  |   (flash page dedicada)    |  |
-|  +-------+--------+  +-------------+--------------+  |
-|          |                          |                 |
-|          v                          v                 |
-|  +-------+------------------------------+--------+   |
-|  |       FIRMWARE DE APLICACAO (BMS)              |   |
-|  |                                                |   |
-|  |  +----------+  +-----------+  +------------+   |   |
-|  |  | Driver   |  | Protecoes |  | Comunic.   |   |   |
-|  |  | TLE9012  |  | OV/UV/OT  |  | CAN app    |   |   |
-|  |  +----------+  +-----------+  +------------+   |   |
-|  +------------------------------------------------+   |
-|                                                      |
-|           UART               FDCAN1                  |
-|            |                   |                      |
-+------------|-------------------|---------------------+
-             |                   |
-       +-----+------+      +----+----+
-       | TLE9015DQU |      | CAN Bus |
-       +-----+------+      +---------+
-             |
-      iso UART daisy-chain
-             |
-       +-----+------+
-       | TLE9012DQU |  (ate 10 em cadeia)
-       +------------+
-</div>
+<p>Toda informação tirada de datasheet ou do regulamento vem com a fonte ao lado, no formato
+<span class="cit">[documento, seção ou tabela, página]</span>. As siglas dos documentos estão nas
+<a href="#s17">Referências</a>. O que é cálculo meu ou ainda não foi conferido está separado na seção de
+<a href="#s16">Rastreabilidade</a>.</p>
 
-<p>Objetivo principal: permitir que mudan&ccedil;as de configura&ccedil;&atilde;o (n&uacute;mero de c&eacute;lulas, thresholds, IDs CAN, etc.) sejam feitas <strong>apenas alterando par&acirc;metros</strong>, sem recompila&ccedil;&atilde;o. Atualiza&ccedil;&otilde;es de firmware s&atilde;o feitas via <strong>bootloader CAN</strong>, eliminando a necessidade de programador f&iacute;sico.</p>
-
-<h3>1.1 Hardware de Desenvolvimento</h3>
+<h3>Onde o projeto está (novembro de 2026)</h3>
 <table>
-<thead>
-  <tr><td>Item</td><td>Componente</td><td>Observa&ccedil;&atilde;o</td></tr>
-</thead>
+<thead><tr><td>Parte</td><td>Situação</td></tr></thead>
 <tbody>
-  <tr><td>MCU</td><td class="id">NUCLEO-G491RE</td><td>Cortex-M4F @170 MHz, 512 KB flash, 128 KB RAM, 3&times; FDCAN, ST-LINK integrado</td></tr>
-  <tr><td>Transceiver</td><td class="id">AURIX TLE9015 Adapter Board V2.0</td><td>Sinais acess&iacute;veis por test points / header COM6 &mdash; n&atilde;o exige AURIX</td></tr>
-  <tr><td>Sensing</td><td class="id">BMS Balancing and Sensing Board V6</td><td>TLE9012DQU + 12 canais + ladder resistivo on-board</td></tr>
-  <tr><td>Debug</td><td class="id">ST-LINK (on-board)</td><td>SWD + VCP para <code>printf</code> pelo mesmo cabo USB</td></tr>
+  <tr><td>Comunicação com o TLE9012 (iso UART)</td><td class="sim">Funcionando em bancada</td></tr>
+  <tr><td>Leitura das 12 tensões de uma CSC</td><td class="sim">Funcionando em bancada</td></tr>
+  <tr><td>Leitura de temperatura por NTC</td><td class="sim">Funcionando em bancada, com 1 canal</td></tr>
+  <tr><td>Proteções de tensão, temperatura e fio aberto</td><td class="sim">Funcionando, com injeção de falha</td></tr>
+  <tr><td>Shutdown com travamento</td><td class="sim">Lógica pronta no firmware</td></tr>
+  <tr><td>Requisitos do projeto e do regulamento</td><td class="sim">Levantados (seção 13)</td></tr>
+  <tr><td>Cadeia completa com 20 CSCs</td><td class="talvez">A fazer</td></tr>
+  <tr><td>Balanceamento</td><td class="talvez">A fazer</td></tr>
+  <tr><td>Luz BMS, lamp check, sinal do TSSI, reset físico, leitura do SDC</td><td class="talvez">A fazer</td></tr>
+  <tr><td>Parâmetros em flash, CAN e bootloader</td><td class="talvez">A fazer (fases 3 e 4)</td></tr>
+  <tr><td>Placa slave própria (1 por módulo)</td><td class="talvez">A fazer</td></tr>
 </tbody>
 </table>
 
-<div class="nota">
-  <div class="rot">Nota &mdash; escolha do MCU</div>
-  O STM32G491RET6 &eacute; equivalente ao STM32G474RET6 para esta aplica&ccedil;&atilde;o: mesma fam&iacute;lia STM32G4,
-  mesmo core, mesma flash e mesmo n&uacute;mero de FDCAN. A diferen&ccedil;a relevante &eacute; o HRTIM, presente
-  apenas no G474 e sem uso neste projeto. Um AURIX TC375 foi considerado (ASIL-D, lockstep, tri-core),
-  mas descartado para a fase de bring-up: a grava&ccedil;&atilde;o de flash no AURIX &eacute; substancialmente mais
-  complexa (bursts de p&aacute;gina, rotinas executadas de PSPR, UCBs), o que encarece o bootloader CAN
-  sem benef&iacute;cio funcional para 12 c&eacute;lulas. A op&ccedil;&atilde;o permanece aberta &mdash; ver se&ccedil;&atilde;o 6.7.
-</div>
+<!-- ===================================================== 2 -->
+<h2 id="s2">2. O sistema</h2>
 
-<h3>1.2 Fases de Implementa&ccedil;&atilde;o</h3>
-<p>O bootloader &eacute; a &uacute;ltima etapa, n&atilde;o a primeira. At&eacute; l&aacute;, grava&ccedil;&atilde;o e depura&ccedil;&atilde;o s&atilde;o feitas normalmente pelo ST-LINK.</p>
+<p>O BMS cuida da bateria do carro. Ele mede a tensão de cada célula e a temperatura do pack, e, se
+alguma coisa sai da faixa segura, abre o shutdown circuit e desliga o sistema de tração. Também é ele
+que equaliza as células (balanceamento) e informa o resto do carro pela CAN.</p>
 
-<table>
-<thead>
-  <tr><td>Fase</td><td>Escopo</td><td>Endere&ccedil;o do App</td><td>Grava&ccedil;&atilde;o</td></tr>
-</thead>
-<tbody>
-  <tr><td class="num">1</td><td>Driver TLE9012 &mdash; ler as 12 tens&otilde;es via UART</td><td class="id">0x0800 0000</td><td>ST-LINK (SWD)</td></tr>
-  <tr><td class="num">2</td><td>Prote&ccedil;&otilde;es e temperatura &mdash; falta balanceamento</td><td class="id">0x0800 0000</td><td>ST-LINK (SWD)</td></tr>
-  <tr><td class="num">3</td><td>Tabela de par&acirc;metros em flash + CAN da aplica&ccedil;&atilde;o</td><td class="id">0x0800 0000</td><td>ST-LINK (SWD)</td></tr>
-  <tr><td class="num">4</td><td>Bootloader CAN</td><td class="id">0x0800 4000</td><td>ST-LINK <em>ou</em> CAN</td></tr>
-</tbody>
-</table>
-
-<div class="nota">
-  <div class="rot">Nota</div>
-  A migra&ccedil;&atilde;o da fase 3 para a 4 exige apenas duas mudan&ccedil;as no app: <code>ORIGIN</code> do linker script
-  para <code>0x08004000</code> e reconfigura&ccedil;&atilde;o do <code>VTOR</code>. O ST-LINK continua gravando e depurando
-  o app normalmente mesmo com o bootloader presente na flash &mdash; as duas vias de grava&ccedil;&atilde;o coexistem.
-</div>
-
-<!-- ========== 2. MAPA DE MEMORIA ========== -->
-<h2 id="s2">2. Mapa de Mem&oacute;ria Flash</h2>
-
-<p>O STM32G491RET6 possui 512 KB de flash. O tamanho de p&aacute;gina depende do bit de op&ccedil;&atilde;o <code>DBANK</code>
-(configura&ccedil;&atilde;o single-bank ou dual-bank) &mdash; consultar RM0440 para o valor efetivo antes de implementar
-o driver de flash. O layout abaixo usa regi&otilde;es m&uacute;ltiplas de 4 KB, portanto permanece v&aacute;lido em
-qualquer uma das duas configura&ccedil;&otilde;es.</p>
-
-<table>
-<thead>
-  <tr><td>Regi&atilde;o</td><td>Endere&ccedil;o Inicial</td><td>Tamanho</td><td>Descri&ccedil;&atilde;o</td></tr>
-</thead>
-<tbody>
-  <tr><td class="id">BOOTLOADER</td><td class="id">0x0800 0000</td><td class="num">16 KB</td><td>Bootloader CAN &mdash; protegido contra escrita (WRP)</td></tr>
-  <tr><td class="id">APP</td><td class="id">0x0800 4000</td><td class="num">480 KB</td><td>Firmware de aplica&ccedil;&atilde;o BMS</td></tr>
-  <tr><td class="id">PARAMS</td><td class="id">0x0807 C000</td><td class="num">8 KB</td><td>Tabela de par&acirc;metros (p&aacute;gina ativa)</td></tr>
-  <tr><td class="id">PARAMS_BKP</td><td class="id">0x0807 E000</td><td class="num">8 KB</td><td>Tabela de par&acirc;metros (backup)</td></tr>
-</tbody>
-</table>
-
-<div class="nota">
-  <div class="rot">Nota</div>
-  O bootloader deve ser protegido com Write Protection (WRP) via option bytes antes de ir a campo,
-  para evitar sobrescrita acidental. Durante o desenvolvimento (fases 1&ndash;3) a WRP fica desabilitada.
-</div>
-
-<div class="aviso">
-  <div class="rot">Aten&ccedil;&atilde;o</div>
-  Nas fases 1 a 3 o app &eacute; compilado no endere&ccedil;o default <code>0x0800 0000</code> e ocupa a flash inteira &mdash;
-  o mapa acima s&oacute; passa a valer na fase 4, quando o bootloader &eacute; introduzido.
-</div>
-
-<!-- ========== 3. BOOTLOADER CAN ========== -->
-<h2 id="s3">3. Bootloader CAN</h2>
-
-<p>O bootloader reside permanentemente na flash e &eacute; executado no reset. Ele decide se entra em modo de atualiza&ccedil;&atilde;o ou pula para a aplica&ccedil;&atilde;o.</p>
-
-<h3>3.1 Condi&ccedil;&otilde;es de Entrada no Bootloader</h3>
-<ol>
-  <li><strong>Flag em RAM persistente</strong> &mdash; a aplica&ccedil;&atilde;o seta um valor m&aacute;gico (ex: <code>0xDEADBEEF</code>) num endere&ccedil;o reservado de RAM e executa reset por software. O bootloader l&ecirc; esse endere&ccedil;o; se encontrar o valor m&aacute;gico, entra em modo de atualiza&ccedil;&atilde;o.</li>
-  <li><strong>Aplicac&atilde;o inv&aacute;lida</strong> &mdash; o bootloader verifica o CRC32 da regi&atilde;o APP armazenado no &uacute;ltimo word da imagem. Se inv&aacute;lido, permanece no bootloader.</li>
-  <li><strong>Comando CAN</strong> &mdash; durante uma janela de 200 ms ap&oacute;s o reset, o bootloader escuta uma mensagem CAN de solicita&ccedil;&atilde;o de atualiza&ccedil;&atilde;o.</li>
-</ol>
-
-<h3>3.2 Protocolo de Atualiza&ccedil;&atilde;o</h3>
-
-<table>
-<thead>
-  <tr><td>Passo</td><td>Dire&ccedil;&atilde;o</td><td>CAN ID</td><td>Conte&uacute;do</td></tr>
-</thead>
-<tbody>
-  <tr><td class="num">1</td><td>PC &rarr; MCU</td><td class="id">0x600</td><td>Comando ENTER_BOOTLOADER</td></tr>
-  <tr><td class="num">2</td><td>MCU &rarr; PC</td><td class="id">0x601</td><td>ACK + vers&atilde;o do bootloader</td></tr>
-  <tr><td class="num">3</td><td>PC &rarr; MCU</td><td class="id">0x600</td><td>ERASE_APP (apaga regi&atilde;o APP)</td></tr>
-  <tr><td class="num">4</td><td>MCU &rarr; PC</td><td class="id">0x601</td><td>ACK ap&oacute;s erase completo</td></tr>
-  <tr><td class="num">5</td><td>PC &rarr; MCU</td><td class="id">0x602</td><td>DATA &mdash; pacotes de 8 bytes sequenciais</td></tr>
-  <tr><td class="num">6</td><td>MCU &rarr; PC</td><td class="id">0x601</td><td>ACK a cada p&aacute;gina (4 KB) gravada</td></tr>
-  <tr><td class="num">7</td><td>PC &rarr; MCU</td><td class="id">0x600</td><td>VERIFY &mdash; CRC32 da imagem completa</td></tr>
-  <tr><td class="num">8</td><td>MCU &rarr; PC</td><td class="id">0x601</td><td>ACK/NACK &mdash; resultado da verifica&ccedil;&atilde;o</td></tr>
-  <tr><td class="num">9</td><td>PC &rarr; MCU</td><td class="id">0x600</td><td>JUMP_APP &mdash; reset para a aplica&ccedil;&atilde;o</td></tr>
-</tbody>
-</table>
-
-<div class="aviso">
-  <div class="rot">Aten&ccedil;&atilde;o</div>
-  O FDCAN1 do STM32G491 &eacute; usado tanto pelo bootloader quanto pela aplica&ccedil;&atilde;o. O bootloader configura o CAN com bitrate fixo de 500 kbit/s. A aplica&ccedil;&atilde;o pode reconfigurar conforme a tabela de par&acirc;metros.
-</div>
-
-<h3>3.3 Salto para a Aplica&ccedil;&atilde;o</h3>
-<p>Ap&oacute;s validar a imagem, o bootloader:</p>
-<ol>
-  <li>Desabilita todas as interrup&ccedil;&otilde;es</li>
-  <li>Desinicializa perif&eacute;ricos usados (FDCAN, SysTick)</li>
-  <li>Configura o MSP (Main Stack Pointer) com o valor do primeiro word em <code>0x0800 4000</code></li>
-  <li>Salta para o endere&ccedil;o do Reset_Handler em <code>0x0800 4004</code></li>
-</ol>
-
-<div class="regra">
-  <div class="rot">Requisito</div>
-  O linker script da aplica&ccedil;&atilde;o deve ter <code>FLASH (rx) : ORIGIN = 0x08004000</code> e o VTOR deve ser reconfigurado no <code>SystemInit</code> para <code>0x08004000</code>.
-</div>
-
-<!-- ========== 4. TABELA DE PARAMETROS ========== -->
-<h2 id="s4">4. Tabela de Par&acirc;metros</h2>
-
-<p>Todos os valores configur&aacute;veis do BMS ficam numa struct armazenada nas &uacute;ltimas p&aacute;ginas da flash. A aplica&ccedil;&atilde;o l&ecirc; essa struct no boot e nunca usa constantes hard-coded.</p>
-
-<table>
-<thead>
-  <tr><td>Par&acirc;metro</td><td>Tipo</td><td>Default</td><td>Unidade</td><td>Descri&ccedil;&atilde;o</td></tr>
-</thead>
-<tbody>
-  <tr><td>num_cells</td><td class="id">uint8</td><td class="num">12</td><td>&mdash;</td><td>N&uacute;mero de c&eacute;lulas por TLE9012</td></tr>
-  <tr><td>num_slaves</td><td class="id">uint8</td><td class="num">1</td><td>&mdash;</td><td>N&uacute;mero de TLE9012 na cadeia</td></tr>
-  <tr><td>ov_threshold_mV</td><td class="id">uint16</td><td class="num">4200</td><td>mV</td><td>Threshold de sobretens&atilde;o</td></tr>
-  <tr><td>uv_threshold_mV</td><td class="id">uint16</td><td class="num">2800</td><td>mV</td><td>Threshold de subtens&atilde;o</td></tr>
-  <tr><td>ot_threshold_C</td><td class="id">int16</td><td class="num">60</td><td>&deg;C</td><td>Threshold de sobretemperatura</td></tr>
-  <tr><td>ut_threshold_C</td><td class="id">int16</td><td class="num">-20</td><td>&deg;C</td><td>Threshold de subtemperatura</td></tr>
-  <tr><td>bal_enable</td><td class="id">uint8</td><td class="num">1</td><td>bool</td><td>Habilita balanceamento passivo</td></tr>
-  <tr><td>bal_delta_mV</td><td class="id">uint16</td><td class="num">10</td><td>mV</td><td>Delta para iniciar balanceamento</td></tr>
-  <tr><td>can_bitrate</td><td class="id">uint32</td><td class="num">500000</td><td>bit/s</td><td>Bitrate do CAN da aplica&ccedil;&atilde;o</td></tr>
-  <tr><td>can_base_id</td><td class="id">uint16</td><td class="num">0x100</td><td>&mdash;</td><td>ID base das mensagens CAN TX</td></tr>
-  <tr><td>meas_period_ms</td><td class="id">uint16</td><td class="num">100</td><td>ms</td><td>Per&iacute;odo de medi&ccedil;&atilde;o de tens&atilde;o</td></tr>
-  <tr><td>temp_period_ms</td><td class="id">uint16</td><td class="num">1000</td><td>ms</td><td>Per&iacute;odo de medi&ccedil;&atilde;o de temperatura</td></tr>
-  <tr><td>num_ntc</td><td class="id">uint8</td><td class="num">5</td><td>&mdash;</td><td>N&uacute;mero de sensores NTC por TLE9012</td></tr>
-  <tr><td>uart_baudrate</td><td class="id">uint32</td><td class="num">2000000</td><td>baud</td><td>Baudrate da iso UART &mdash; <strong>m&iacute;nimo 1000000</strong></td></tr>
-  <tr><td>crc32</td><td class="id">uint32</td><td class="num">&mdash;</td><td>&mdash;</td><td>CRC32 da struct (valida&ccedil;&atilde;o)</td></tr>
-</tbody>
-</table>
-
-<div class="nota">
-  <div class="rot">Nota</div>
-  Os par&acirc;metros podem ser atualizados via mensagem CAN sem necessidade de bootloader &mdash; a aplica&ccedil;&atilde;o recebe o comando, apaga a p&aacute;gina de par&acirc;metros, grava a nova struct e reinicia.
-  O campo <code>crc32</code> protege contra corrup&ccedil;&atilde;o; se inv&aacute;lido, a aplica&ccedil;&atilde;o carrega os valores default.
-</div>
-
-<!-- ========== 5. FIRMWARE DE APLICACAO ========== -->
-<h2 id="s5">5. Firmware de Aplica&ccedil;&atilde;o</h2>
-
-<h3 id="s51">5.1 M&oacute;dulos</h3>
-
-<table>
-<thead>
-  <tr><td>M&oacute;dulo</td><td>Arquivo</td><td>Responsabilidade</td></tr>
-</thead>
-<tbody>
-  <tr><td>Main</td><td class="id">main.c</td><td>Init de perif&eacute;ricos, loop principal, scheduler</td></tr>
-  <tr><td>TLE9012 Driver</td><td class="id">tle9012.c/h</td><td>Comunica&ccedil;&atilde;o iso UART, leitura de c&eacute;lulas e temperaturas, balanceamento</td></tr>
-  <tr><td>TLE9015 Driver</td><td class="id">tle9015.c/h</td><td>Init do transceiver, wake-up, sleep</td></tr>
-  <tr><td>CRC</td><td class="id">crc_j1850.c/h</td><td>CRC8 SAE-J1850 e CRC3 do reply frame, bit a bit</td></tr>
-  <tr><td>Par&acirc;metros</td><td class="id">params.c/h</td><td>Leitura/escrita da tabela de par&acirc;metros na flash</td></tr>
-  <tr><td>Prote&ccedil;&otilde;es</td><td class="id">protection.c/h</td><td>L&oacute;gica OV, UV, OT, UT, open-wire &mdash; flags e a&ccedil;&otilde;es</td></tr>
-  <tr><td>Balanceamento</td><td class="id">balancing.c/h</td><td>Algoritmo de balanceamento passivo baseado em delta de tens&atilde;o</td></tr>
-  <tr><td>CAN App</td><td class="id">can_app.c/h</td><td>Transmiss&atilde;o de dados, recep&ccedil;&atilde;o de comandos, atualiza&ccedil;&atilde;o de par&acirc;metros</td></tr>
-  <tr><td>BSP</td><td class="id">bsp.c/h</td><td>Abstra&ccedil;&atilde;o de GPIOs, LEDs, ERR pin</td></tr>
-</tbody>
-</table>
-
-<h3 id="s52">5.2 M&aacute;quina de Estados</h3>
-
-<div class="arq">
-                    +----------+
-         reset ---->|  INIT    |
-                    +----+-----+
-                         |
-              init OK    |   init FAIL
-              +----------+----------+
-              v                     v
-        +-----+------+       +-----+-----+
-        | MONITORING |       |   ERROR   |
-        +-----+------+       +-----+-----+
-              |                     ^
-              | fault detected      |
-              +---------------------+
-              |
-              | bal_enable &&
-              | delta > bal_delta_mV
-              v
-        +-----+------+
-        | BALANCING  |  (retorna a MONITORING
-        +------------+   apos ciclo)
-</div>
-
-<p><strong>INIT:</strong> configura perif&eacute;ricos, carrega par&acirc;metros, inicializa cadeia TLE9012 (atribui NODE_IDs), configura registradores (PART_CONFIG, OV/UV thresholds, TEMP_CONF).</p>
-<p><strong>MONITORING:</strong> loop peri&oacute;dico &mdash; dispara medi&ccedil;&atilde;o (PCVM_START), l&ecirc; 12 tens&otilde;es e temperaturas, verifica prote&ccedil;&otilde;es, transmite via CAN.</p>
-<p><strong>BALANCING:</strong> ativa balanceamento passivo nas c&eacute;lulas acima da tens&atilde;o m&iacute;nima + delta. Desativa durante medi&ccedil;&atilde;o (PBOFF).</p>
-<p><strong>ERROR:</strong> desativa balanceamento, sinaliza via CAN e ERR pin. Permite retry ap&oacute;s comando CAN.</p>
-
-<!-- ========== 6. DRIVER TLE9012 ========== -->
-<h2 id="s6">6. Driver TLE9012 / TLE9015</h2>
-
-<h3 id="s61">6.1 Protocolo iso UART</h3>
-<p>A comunica&ccedil;&atilde;o entre o MCU e o TLE9015 &eacute; feita por UART padr&atilde;o. O TLE9015 converte para iso UART (diferencial, half-duplex, 2 fios com acoplamento capacitivo ou por transformador) e encaminha para a cadeia de TLE9012.</p>
-
-<table>
-<thead>
-  <tr><td>Par&acirc;metro</td><td>Valor</td></tr>
-</thead>
-<tbody>
-  <tr><td>Baudrate</td><td class="num">2 Mbit/s (oficial) &mdash; m&iacute;nimo 1 Mbit/s</td></tr>
-  <tr><td>Data bits</td><td class="num">8</td></tr>
-  <tr><td>Paridade</td><td>Nenhuma</td></tr>
-  <tr><td>Stop bits</td><td class="num">1</td></tr>
-  <tr><td>Dire&ccedil;&atilde;o</td><td>Single-wire half-duplex (TX e RX no mesmo pino)</td></tr>
-</tbody>
-</table>
-
-<div class="regra">
-  <div class="rot">Requisito cr&iacute;tico &mdash; baudrate</div>
-  A iso UART <strong>n&atilde;o funciona abaixo de 1 Mbit/s</strong>. O baudrate oficialmente suportado &eacute; 2 Mbit/s.
-  Os 115200 baud que aparecem na Figura 14 do manual da Infineon referem-se ao <strong>terminal de debug
-  PC&harr;AURIX</strong> (TeraTerm), <em>n&atilde;o</em> ao link iso UART &mdash; confundir os dois leva a um link que
-  jamais estabelece comunica&ccedil;&atilde;o. O pr&oacute;prio menu do firmware de demo confirma
-  (<code>CS 1000000 &rarr; UART baudrate change to 1Mb</code>).
-</div>
-
-<div class="regra">
-  <div class="rot">Requisito cr&iacute;tico &mdash; timing entre bytes</div>
-  Os bytes de um frame devem ser transmitidos <strong>sem atraso significativo entre si</strong>, sob pena de
-  disparar timeout no transceiver iso UART e corromper a mensagem. A 2 Mbit/s cada byte dura 5 &micro;s
-  (10 bits), o que inviabiliza envio byte-a-byte por polling.
-  <strong>Consequ&ecirc;ncia de projeto: o TX deve usar DMA</strong>, entregando os 6 bytes do frame como um bloco
-  cont&iacute;guo ao USART. O RX tamb&eacute;m deve usar DMA (circular) para n&atilde;o perder bytes.
-</div>
-
-<div class="nota">
-  <div class="rot">Nota &mdash; viabilidade no G491</div>
-  A 170 MHz, 2 Mbit/s exige divisor <code>BRR = 85</code> no USART1 &mdash; valor inteiro exato, sem erro de
-  baudrate. &Eacute; justamente essa exig&ecirc;ncia de timing que inviabiliza Arduinos baseados em ATmega328
-  nesta aplica&ccedil;&atilde;o, e que o Cortex-M4 com DMA atende sem dificuldade.
-</div>
-
-<h4>Liga&ccedil;&atilde;o f&iacute;sica MCU &rarr; TLE9015</h4>
-<p>Pelo esquem&aacute;tico do transceiver (Figura 24 do manual), <code>UART_LS</code> &eacute; um <strong>pino &uacute;nico</strong>:
-o host conecta TX e RX a ele atrav&eacute;s da rede <code>R_UART</code> (1,5 k&Omega; t&iacute;pico, &tau; &le; 50 ns &mdash; Tabela 5).
-Trata-se portanto de <strong>single-wire half-duplex</strong>, e n&atilde;o de um par TX/RX independente.</p>
-
-<p>A biblioteca de refer&ecirc;ncia <em>TLE9012_Arduino_Lib</em> (ver se&ccedil;&atilde;o 9) confirma independentemente
-a mesma topologia: <em>&ldquo;cada pino funciona como RX e TX&rdquo;</em>, sendo necess&aacute;rio
-<em>&ldquo;conectar os pinos rx e tx atrav&eacute;s de um resistor s&eacute;rie&rdquo;</em>, com valor t&iacute;pico de
-1 k&Omega; a 1,5 k&Omega; &mdash; coerente com o <code>R_UART</code> da Tabela 5.</p>
-
-<div class="aviso">
-  <div class="rot">Aten&ccedil;&atilde;o</div>
-  Duas op&ccedil;&otilde;es de implementa&ccedil;&atilde;o no STM32: (a) modo single-wire nativo do USART pelo bit <code>HDSEL</code>
-  (<code>HAL_HalfDuplex_Init</code>), em que TX e RX compartilham o pino <code>TX</code> em open-drain; ou
-  (b) manter TX e RX separados no MCU e uni-los externamente pelo resistor s&eacute;rie, como fazem as
-  bibliotecas Arduino. A op&ccedil;&atilde;o (a) dispensa o resistor no lado do MCU, mas exige descartar o eco
-  local de cada byte transmitido. Confirmar a topologia da placa antes de fiar.
-</div>
-
-<table>
-<thead>
-  <tr><td>Sinal (adapter board)</td><td>NUCLEO-G491RE</td><td>Fun&ccedil;&atilde;o</td></tr>
-</thead>
-<tbody>
-  <tr><td class="id">UART_LS</td><td class="id">PA9 &mdash; USART1_TX</td><td>iso UART low-side (single-wire, via R_UART)</td></tr>
-  <tr><td class="id">nSLEEP</td><td class="id">GPIO livre</td><td>Wake-up do transceiver</td></tr>
-  <tr><td class="id">ERRQ</td><td class="id">GPIO (EXTI)</td><td>Sinaliza&ccedil;&atilde;o de erro do transceiver</td></tr>
-  <tr><td class="id">3.3V / GND</td><td class="id">3V3 / GND</td><td>Refer&ecirc;ncia comum &mdash; lado de baixa tens&atilde;o</td></tr>
-</tbody>
-</table>
-
-<div class="nota">
-  <div class="rot">Nota</div>
-  O USART2 (<code>PA2</code>/<code>PA3</code>) do NUCLEO-64 est&aacute; ligado ao VCP do ST-LINK por solder bridges;
-  reserv&aacute;-lo para <code>printf</code> de debug permite acompanhar as tens&otilde;es pelo mesmo cabo USB da grava&ccedil;&atilde;o.
-  Por isso o TLE9015 usa o USART1. A tabela acima &eacute; uma proposta de pinagem, n&atilde;o uma restri&ccedil;&atilde;o do hardware.
-</div>
-
-<div class="regra">
-  <div class="rot">Requisito</div>
-  A NUCLEO-G491RE <strong>n&atilde;o possui transceiver CAN on-board</strong>. Para as fases 3 e 4 &eacute; necess&aacute;rio
-  um transceiver externo (ex.: TJA1051, SN65HVD230) ligado aos pinos do FDCAN1, com terminac&atilde;o de 120 &Omega;.
-</div>
-
-<h3 id="s62">6.2 Estrutura do Frame</h3>
-
-<p>O frame de <strong>escrita</strong> tem 6 bytes; o de <strong>leitura</strong> tem 4 (n&atilde;o possui campo DATA):</p>
-
-<table>
-<thead>
-  <tr><td>Byte</td><td>Campo</td><td>Write</td><td>Read</td><td>Descri&ccedil;&atilde;o</td></tr>
-</thead>
-<tbody>
-  <tr><td class="num">0</td><td class="id">SYNC</td><td class="sim">&#10003;</td><td class="sim">&#10003;</td><td>Sempre <code>0x1E</code> &mdash; sincroniza&ccedil;&atilde;o</td></tr>
-  <tr><td class="num">1</td><td class="id">ID</td><td class="sim">&#10003;</td><td class="sim">&#10003;</td><td>bit[7]: R/W (1=write, 0=read); bits[5:0]: NODE_ID (0x00=n&atilde;o endere&ccedil;ado, 0x3F=broadcast)</td></tr>
-  <tr><td class="num">2</td><td class="id">ADDR</td><td class="sim">&#10003;</td><td class="sim">&#10003;</td><td>Endere&ccedil;o do registrador alvo</td></tr>
-  <tr><td class="num">3&ndash;4</td><td class="id">DATA</td><td class="sim">&#10003;</td><td class="nao">&mdash;</td><td>Dado, big-endian. Ausente no frame de leitura</td></tr>
-  <tr><td class="num">5</td><td class="id">CRC8</td><td class="sim">&#10003;</td><td class="sim">&#10003;</td><td>CRC SAE-J1850 sobre os bytes anteriores</td></tr>
-</tbody>
-</table>
-
-<div class="aviso">
-  <div class="rot">Corre&ccedil;&atilde;o em rela&ccedil;&atilde;o &agrave;s revis&otilde;es 1.0&ndash;1.2</div>
-  As revis&otilde;es anteriores descreviam o frame de leitura como tendo 6 bytes, com o host enviando
-  <code>0x0000</code> no campo DATA. Est&aacute; <strong>incorreto</strong>: o frame de leitura tem 4 bytes.
-  Confere com a Tabela 11 do manual (que lista apenas SYNC / ID / ADDR / CRC) e com a contagem de
-  bytes da biblioteca de refer&ecirc;ncia.
-</div>
-
-<h4>Ordem de bits &mdash; MSB first</h4>
-<p>Os bytes trafegam com o <strong>bit mais significativo primeiro</strong>, ao contr&aacute;rio do UART
-convencional. A biblioteca Arduino contorna isso invertendo os bits por software
-(<code>msb_first_converter</code>) porque o core do Arduino s&oacute; transmite LSB-first.</p>
-
-<div class="decisao">
-  <div class="rot">Vantagem do STM32</div>
-  <div class="peca">CR2.MSBFIRST</div>
-  <p>O USART do STM32 implementa MSB-first em <strong>hardware</strong>, tanto no TX quanto no RX.
-  No CubeMX: USART1 &rarr; Parameter Settings &rarr; Advanced Parameters &rarr; <em>MSB First = Enable</em>.
-  Dispensa completamente a invers&atilde;o de bits por software.</p>
-</div>
-
-<h4>Eco e contagem de bytes</h4>
-<p>Como a linha &eacute; compartilhada, o host <strong>recebe de volta tudo o que transmite</strong>. O driver
-deve descartar o eco antes de interpretar a resposta:</p>
-
-<table>
-<thead>
-  <tr><td>Opera&ccedil;&atilde;o</td><td>Host envia</td><td>Total recebido</td><td>Composi&ccedil;&atilde;o</td></tr>
-</thead>
-<tbody>
-  <tr><td>Read</td><td class="num">4 bytes</td><td class="num">9 bytes</td><td>4 de eco + 5 de resposta</td></tr>
-  <tr><td>Write</td><td class="num">6 bytes</td><td class="num">7 bytes</td><td>6 de eco + 1 byte de reply frame</td></tr>
-</tbody>
-</table>
-
-<h3 id="s63">6.3 CRC &mdash; dois polin&ocirc;mios distintos</h3>
-
-<p>O protocolo usa <strong>dois</strong> CRCs diferentes, um para frames de dados e outro para o reply frame:</p>
-
-<table>
-<thead>
-  <tr><td>CRC</td><td>Aplica&ccedil;&atilde;o</td><td>Polin&ocirc;mio</td><td>Init</td><td>XOR final</td><td>Valida&ccedil;&atilde;o</td></tr>
-</thead>
-<tbody>
-  <tr><td class="id">CRC8</td><td>Frames de dados (read e write)</td><td class="id">0x1D</td><td class="id">0xFF</td><td class="id">0xFF</td><td>Comparar com o byte recebido</td></tr>
-  <tr><td class="id">CRC3</td><td>Reply frame do write (1 byte)</td><td class="id">0xB0</td><td>o pr&oacute;prio byte</td><td>&mdash;</td><td>V&aacute;lido se o resultado for <strong>zero</strong></td></tr>
-</tbody>
-</table>
-
-<p>O CRC8 &eacute; o SAE-J1850: <code>G(z) = z&sup8; + z&sup4; + z&sup3; + z&sup2; + 1</code>.</p>
-
-<div class="nota">
-  <div class="rot">Corre&ccedil;&atilde;o em rela&ccedil;&atilde;o &agrave;s revis&otilde;es 1.0&ndash;1.3</div>
-  As revis&otilde;es anteriores recomendavam implementar o CRC por <em>lookup table</em> de 256 bytes,
-  alegando aperto de tempo. <strong>A justificativa estava errada.</strong> Um frame tem no maximo
-  5 bytes, ou seja 40 itera&ccedil;&otilde;es &mdash; cerca de 0,3 &micro;s a 170 MHz, contra ~30 &micro;s de
-  dura&ccedil;&atilde;o do proprio frame no fio a 2 Mbit/s. A tabela custaria 256 bytes de flash para
-  economizar 1% do tempo da transa&ccedil;&atilde;o. A implementa&ccedil;&atilde;o adotada e <strong>bit a bit</strong>,
-  que alem de suficiente e mais facil de auditar.
-</div>
-
-<p>O CRC3 opera sobre o &uacute;nico byte de reply, deslocando 5 vezes com realimenta&ccedil;&atilde;o condicional do
-polin&ocirc;mio <code>0xB0</code>; o frame &eacute; considerado v&aacute;lido quando o resultado &eacute; zero.</p>
-
-<div class="nota">
-  <div class="rot">Nota</div>
-  As revis&otilde;es 1.0&ndash;1.2 documentavam apenas o CRC8. O CRC3 do reply frame foi identificado na
-  implementa&ccedil;&atilde;o de refer&ecirc;ncia (se&ccedil;&atilde;o 9.1) e &eacute; obrigat&oacute;rio para validar confirma&ccedil;&otilde;es de escrita.
-</div>
-
-<h3 id="s64">6.4 Sequ&ecirc;ncia de Inicializa&ccedil;&atilde;o</h3>
-<p>A inicializa&ccedil;&atilde;o atribui NODE_IDs sequencialmente, come&ccedil;ando pelo IC mais pr&oacute;ximo ao transceiver:</p>
-
-<table>
-<thead>
-  <tr><td>Passo</td><td>A&ccedil;&atilde;o</td><td>Frame (hex)</td></tr>
-</thead>
-<tbody>
-  <tr><td class="num">1</td><td>Atribuir NODE_ID = 0x01 ao 1&ordm; IC</td><td class="id">1E 80 36 0001 ED</td></tr>
-  <tr><td class="num">2</td><td>Atribuir NODE_ID = 0x02 ao 2&ordm; IC</td><td class="id">1E 80 36 0002 CA</td></tr>
-  <tr><td class="num">3</td><td>...</td><td>...</td></tr>
-  <tr><td class="num">N</td><td>Atribuir NODE_ID = N ao &uacute;ltimo IC (FN=1)</td><td class="id">1E 80 36 08xx CRC</td></tr>
-</tbody>
-</table>
-
-<div class="nota">
-  <div class="rot">Nota</div>
-  O &uacute;ltimo IC da cadeia deve ter o bit FN (Final Node) setado no campo DATA (bit 11 = 1, ex: <code>0x0804</code> para NODE_ID=4). Sem isso, o broadcast gera timeout na iso UART.
-  O watchdog do TLE9012 deve ser alimentado durante a inicializa&ccedil;&atilde;o, caso contr&aacute;rio o IC volta para sleep e perde o NODE_ID.
-</div>
-
-<h3 id="s65">6.5 Leitura de Tens&otilde;es</h3>
-<ol>
-  <li>Configurar <code>PART_CONFIG</code> (0x01) com as c&eacute;lulas ativas: <code>0x0FFF</code> para 12 c&eacute;lulas</li>
-  <li>Escrever <code>MEAS_CTRL</code> (0x18) com PCVM_START=1, CVM_MODE=16-bit: <code>0xE021</code></li>
-  <li>Aguardar tempo de convers&atilde;o (~2 ms para 16-bit)</li>
-  <li>Ler registradores PCVM_0 (0x19) a PCVM_11 (0x24)</li>
-  <li>Converter: <code>V_cell [V] = (5.0 / 65536) &times; RESULT</code></li>
-</ol>
-
-<div class="decisao">
-  <div class="rot">F&oacute;rmula de Convers&atilde;o</div>
-  <div class="peca">V = (FSR / 2&sup1;&sup6;) &times; RAW</div>
-  <p>Onde FSR = 5,0 V (Full Scale Range do ADC do TLE9012). Para PCVM_0 = <code>0xABCD</code>: V = (5,0 / 65536) &times; 0xABCD = 3,355 V.</p>
-</div>
-
-<h3 id="s66">6.6 Leitura de Temperatura</h3>
-<p>O TLE9012 suporta at&eacute; 5 sensores NTC externos, configurados via <code>TEMP_CONF</code> (0x04). Os resultados ficam em TEMP_RESULT_0 (0x29) a TEMP_RESULT_4 (0x2D). A convers&atilde;o depende do NTC utilizado (tabela de lookup espec&iacute;fica do componente).</p>
-
-<h3 id="s67">6.7 Portabilidade &mdash; Isolamento do Transporte</h3>
-
-<p>O m&oacute;dulo <code>tle9012.c</code> n&atilde;o deve conter <strong>nenhuma chamada de HAL</strong>. Toda a depend&ecirc;ncia
-de hardware &eacute; injetada por uma interface de transporte, o que mant&eacute;m o driver &mdash; montagem de frame,
-CRC, mapa de registradores, convers&otilde;es &mdash; independente do MCU:</p>
-
-<div class="arq">
-typedef struct {
-    bool (*send)(const uint8_t *buf, uint16_t len);
-    bool (*recv)(uint8_t *buf, uint16_t len, uint32_t timeout_ms);
-    void (*delay_us)(uint32_t us);
-} tle9012_transport_t;
-</div>
-
-<p>Consequ&ecirc;ncia pr&aacute;tica: migrar para um AURIX TC375 no futuro exige reimplementar apenas essas tr&ecirc;s
-fun&ccedil;&otilde;es sobre ASCLIN, sem tocar na l&oacute;gica do driver. O mesmo vale para testes unit&aacute;rios em PC, onde
-o transporte pode ser substitu&iacute;do por um <em>mock</em> que reproduz respostas conhecidas do TLE9012.</p>
-
-<h3 id="s68">6.8 Configura&ccedil;&atilde;o do Perif&eacute;rico no STM32CubeMX</h3>
-
-<h4>USART1 &mdash; Parameter Settings</h4>
-<table>
-<thead>
-  <tr><td>Campo</td><td>Valor</td><td>Justificativa</td></tr>
-</thead>
-<tbody>
-  <tr><td>Mode</td><td class="id">Asynchronous</td><td>TX <code>PA9</code>, RX <code>PA10</code> &mdash; casa com os pads LS_TX/LS_RX da adapter board</td></tr>
-  <tr><td>Baud Rate</td><td class="id">2000000</td><td>M&iacute;nimo funcional &eacute; 1 Mbit/s; 2 Mbit/s &eacute; o oficial</td></tr>
-  <tr><td>Word Length</td><td class="id">8 Bits</td><td>Sem paridade</td></tr>
-  <tr><td>Parity / Stop Bits</td><td class="id">None / 1</td><td>&mdash;</td></tr>
-  <tr><td>Data Direction</td><td class="id">Receive and Transmit</td><td>&mdash;</td></tr>
-  <tr><td>Over Sampling</td><td class="id">16</td><td>A 170 MHz resulta em <code>BRR = 85</code> exato</td></tr>
-  <tr class="destaque"><td>Advanced &rarr; MSB First</td><td class="id">Enable</td><td><strong>Obrigat&oacute;rio</strong> &mdash; protocolo &eacute; MSB-first (se&ccedil;&atilde;o 6.2)</td></tr>
-  <tr><td>Advanced &rarr; Auto Baudrate</td><td class="id">Disable</td><td>&mdash;</td></tr>
-  <tr><td>Advanced &rarr; TX/RX Swap</td><td class="id">Disable</td><td>&mdash;</td></tr>
-</tbody>
-</table>
-
-<p>Alternativa: modo <em>Single Wire (Half-Duplex)</em>, que usa apenas <code>PA9</code> em open-drain
-bidirecional. Nesse caso o resistor s&eacute;rie fica por conta do projetista. Ambos os modos produzem
-eco &mdash; a diferen&ccedil;a &eacute; apenas o n&uacute;mero de fios.</p>
-
-<h4>USART1 &mdash; DMA Settings</h4>
-<table>
-<thead>
-  <tr><td>Request</td><td>Direction</td><td>Mode</td><td>Priority</td><td>Data Width</td></tr>
-</thead>
-<tbody>
-  <tr><td class="id">USART1_TX</td><td>Memory &rarr; Peripheral</td><td class="id">Normal</td><td>High</td><td>Byte / Byte</td></tr>
-  <tr><td class="id">USART1_RX</td><td>Peripheral &rarr; Memory</td><td class="id">Circular</td><td>Very High</td><td>Byte / Byte</td></tr>
-</tbody>
-</table>
-
-<p><em>Increment Address</em>: apenas <strong>Memory</strong> marcado (default do CubeMX, correto).</p>
-
-<div class="nota">
-  <div class="rot">Nota &mdash; por que Circular no RX</div>
-  O protocolo &eacute; request/response e o host recebe o pr&oacute;prio eco. Em modo <em>Normal</em>, o DMA
-  precisaria ser re-armado entre frames, e a 2 Mbit/s a resposta do escravo pode chegar exatamente
-  dentro dessa janela. Em modo <em>Circular</em> a recep&ccedil;&atilde;o nunca para, eliminando a janela de perda.
-  O DMAMUX do STM32G4 roteia os requests automaticamente &mdash; nada a configurar manualmente.
-</div>
-
-<h4>NVIC Settings</h4>
+<p>O sistema tem duas partes:</p>
 <ul>
-  <li><strong>USART1 global interrupt: Enable</strong> &mdash; necess&aacute;rio para detec&ccedil;&atilde;o de linha ociosa
-      (<code>HAL_UARTEx_ReceiveToIdle_DMA</code>), que delimita o fim do frame</li>
-  <li><code>DMA1 channelX global interrupt</code> &mdash; habilitados automaticamente ao adicionar os
-      requests; apenas conferir</li>
+  <li><strong>Master:</strong> um STM32 que roda o firmware e decide tudo, ligado a um TLE9015, que é o
+      transceiver da comunicação.</li>
+  <li><strong>Slaves:</strong> uma placa presa a cada módulo, com 4 <strong>CSCs</strong> (<em>cell supervision
+      circuits</em>). Cada CSC é um TLE9012, que mede até 12 células e 5 termistores.</li>
 </ul>
 
-<h4>Demais perif&eacute;ricos</h4>
+<p>As CSCs ficam em potenciais diferentes, que chegam a 588 V em relação ao chassi. Por isso elas não
+falam direto com o STM32: conversam entre si e com o TLE9015 por <strong>iso UART</strong>, um barramento
+diferencial que atravessa a isolação por capacitor (dentro do módulo, entre CSCs vizinhas) ou por
+transformador (entre módulos). O STM32 só enxerga uma UART comum.</p>
+
+<div class="arq">  Master: STM32G491 --UART--> TLE9015
+                               |
+                          iso UART (transformador)
+                               |
+  Slave 1 (módulo 1) [CSC 1]--[CSC 2]--[CSC 3]--[CSC 4]     mesma placa: trilha, capacitivo
+                               |
+                          transformador
+                               |
+  Slave 2 (módulo 2) [CSC 5]--[CSC 6]--[CSC 7]--[CSC 8]
+                              ...
+  Slave 5 (módulo 5) [CSC 17]-[CSC 18]-[CSC 19]-[CSC 20]   (último nó da cadeia)</div>
+
 <table>
-<thead>
-  <tr><td>Item</td><td>Configura&ccedil;&atilde;o</td><td>Fase</td></tr>
-</thead>
+<thead><tr><td>Item</td><td>Valor</td><td>De onde vem</td></tr></thead>
 <tbody>
-  <tr><td>Clock</td><td>HSI16 &rarr; PLL (M=4, N=85, R=2) = <strong>170 MHz</strong>; Flash 4WS + PWR boost mode</td><td class="num">1</td></tr>
-  <tr><td>USART2</td><td><code>PA2</code>/<code>PA3</code>, 115200, ass&iacute;ncrono, sem DMA &mdash; VCP do ST-LINK para <code>printf</code></td><td class="num">1</td></tr>
-  <tr><td>Watchdog do TLE9012</td><td>Sem perif&eacute;rico dedicado &mdash; SysTick + timer por software</td><td class="num">1</td></tr>
-  <tr><td>FDCAN1</td><td>Adiar; exige transceiver externo</td><td class="num">3</td></tr>
+  <tr><td>Arranjo do acumulador</td><td>140S3P, 420 células</td><td>Decisão da equipe</td></tr>
+  <tr><td>Módulos</td><td>5 &times; 28S3P</td><td>Limite de 120 V por módulo <span class="cit">[FSAE, EV.5.1.1, p. 96]</span></td></tr>
+  <tr><td>Tensão máxima do módulo</td><td>28 &times; 4,2 V = 117,6 V</td><td>Cálculo meu</td></tr>
+  <tr><td>Tensão máxima do pack</td><td>140 &times; 4,2 V = 588 V</td><td>Limite de 600 V <span class="cit">[FSAE, EV.3.3.2, p. 93]</span></td></tr>
+  <tr><td>Slaves</td><td>1 por módulo, 5 no total</td><td>Decisão (D27)</td></tr>
+  <tr><td>CSCs</td><td>4 por slave, 20 no total</td><td>Decisão (seção 13.2)</td></tr>
+  <tr><td>Grupos 3P por CSC</td><td>7</td><td>28 grupos &divide; 4 CSCs</td></tr>
+  <tr><td>Termistores</td><td>13 por módulo, 65 no total</td><td>Meta de 30% das células (seção 13.2)</td></tr>
+</tbody>
+</table>
+
+<p><strong>Por que 140S, e não mais:</strong> o regulamento limita cada módulo a 120 V
+<span class="cit">[FSAE, EV.5.1.1, p. 96]</span>. Com 4,2 V por célula, cabem no máximo 28 em série
+(117,6 V); 29 já daria 121,8 V. Cinco módulos somam então no máximo 140S.</p>
+
+<!-- ===================================================== 3 -->
+<h2 id="s3">3. Por que esses componentes</h2>
+
+<table>
+<thead><tr><td>Componente</td><td>O que faz</td><td>Por que escolhi</td></tr></thead>
+<tbody>
+  <tr><td class="id">TLE9012DQU</td><td>Mede as células e os termistores de uma CSC</td>
+      <td>Mede até 12 células em série com um ADC de 16 bits por célula, tem 5 canais de NTC, balanceamento
+      interno de até 200 mA e comunicação de 2 Mbit/s com até 38 CIs na cadeia
+      <span class="cit">[DS12, Features, p. 1]</span>. E havia kits de avaliação disponíveis.</td></tr>
+  <tr><td class="id">TLE9015DQU</td><td>Transceiver entre o MCU e a cadeia</td>
+      <td>Converte UART comum em iso UART e é o par natural do TLE9012
+      <span class="cit">[DS15, Features, p. 1]</span>.</td></tr>
+  <tr><td class="id">STM32G491RE</td><td>Master: roda o firmware</td>
+      <td>Eu já tinha a NUCLEO-G491RE. Tem Cortex-M4 a 170 MHz, DMA e FDCAN, que é o que o projeto precisa.</td></tr>
+</tbody>
+</table>
+
+<p><strong>Alternativas que considerei.</strong> O STM32G474 seria equivalente para este uso: só tem
+HRTIM a mais, que não uso. Também pensei no AURIX TC375, que tem lockstep e ASIL-D, mas adiei: gravar a
+flash do AURIX é bem mais complicado, o que encareceria o bootloader sem ganho nenhum agora. Para não
+fechar essa porta, escrevi o driver do TLE9012 sem nenhuma chamada de HAL (seção 6). Se um dia o BMS
+for para o AURIX, só a camada de transporte muda.</p>
+
+<p><strong>Bare-metal, sem RTOS.</strong> O firmware é um laço periódico: mede, confere, sinaliza. Um
+RTOS não traria ganho e acrescentaria uma camada a mais para depurar.</p>
+
+<p><strong>Depuração pelo Live Expressions, sem <code>printf</code>.</strong> O Live Expressions do
+STM32CubeIDE mostra as variáveis ao vivo sem parar o programa e sem gastar uma UART. Por isso todo o
+estado do firmware fica organizado em structs fáceis de abrir no depurador (seção 11).</p>
+
+<!-- ===================================================== 4 -->
+<h2 id="s4">4. Como organizei o trabalho</h2>
+
+<p>Dividi o projeto em quatro fases, cada uma testável sozinha em bancada:</p>
+
+<table>
+<thead><tr><td>Fase</td><td>O que entrega</td><td>Situação</td></tr></thead>
+<tbody>
+  <tr><td class="num">1</td><td>Falar com o TLE9012 e ler as 12 tensões</td><td class="sim">Concluída</td></tr>
+  <tr><td class="num">2</td><td>Temperatura, proteções, shutdown e balanceamento</td><td class="talvez">Falta o balanceamento</td></tr>
+  <tr><td class="num">3</td><td>Cadeia completa, parâmetros em flash e CAN</td><td class="talvez">A fazer</td></tr>
+  <tr><td class="num">4</td><td>Bootloader pela CAN</td><td class="talvez">A fazer</td></tr>
+</tbody>
+</table>
+
+<p><strong>O bootloader ficou para o fim de propósito.</strong> Ele é conveniência de manutenção (atualizar
+o firmware sem abrir o carro), não condição para competir. Até lá eu gravo e depuro pelo ST-Link
+normalmente. Quando ele entrar, a aplicação só muda de endereço na flash (de <code>0x08000000</code> para
+<code>0x08004000</code>) e o ST-Link continua funcionando.</p>
+
+<!-- ===================================================== 5 -->
+<h2 id="s5">5. Montagem da bancada</h2>
+
+<p>Toda a fase 1 e a fase 2 foram feitas com os kits de avaliação da Infineon, antes de existir qualquer
+placa própria:</p>
+
+<table>
+<thead><tr><td>Placa</td><td>Papel</td></tr></thead>
+<tbody>
+  <tr><td>NUCLEO-G491RE</td><td>Master, com ST-Link embutido</td></tr>
+  <tr><td>TLE9015 Adapter Board V2.0</td><td>Transceiver</td></tr>
+  <tr><td>BMS Balancing and Sensing Board V6</td><td>Uma CSC (TLE9012), com divisor resistivo no lugar das células</td></tr>
+  <tr><td>Bateria de 12 V</td><td>Alimenta a CSC e o divisor, que simula 12 células</td></tr>
+</tbody>
+</table>
+
+<h3>Ligações</h3>
+<table>
+<thead><tr><td>De</td><td>Para</td><td>Observação</td></tr></thead>
+<tbody>
+  <tr><td>PC4 (TX do USART1)</td><td>Pad <code>TXD_LS</code> do TLE9015</td><td rowspan="2">Na placa, o resistor <code>R_UART</code> de 1,5 kΩ liga o TX ao <code>UART_LS</code>, então TX e RX acabam no mesmo fio <span class="cit">[UM, Tab. 5, p. 30]</span></td></tr>
+  <tr><td>PC5 (RX do USART1)</td><td><code>UART_LS</code> do TLE9015</td></tr>
+  <tr><td>5 V da Nucleo</td><td><code>VS</code> do TLE9015</td><td>Faixa de 4,75 a 45 V <span class="cit">[DS15, PRQ-1367, p. 9]</span></td></tr>
+  <tr class="destaque"><td>3V3 da Nucleo</td><td><code>VIO</code> do TLE9015</td><td>Faixa de 3 a 5,5 V <span class="cit">[DS15, PRQ-520, p. 9]</span>. Obrigatório (ver abaixo)</td></tr>
+  <tr><td>PB0 da Nucleo</td><td><code>nSleep</code> do TLE9015</td><td>Mantém o transceiver acordado</td></tr>
+  <tr><td>Conector HS do TLE9015</td><td>Conector L P / L N da CSC</td><td>A ligação é cruzada (ver abaixo)</td></tr>
+  <tr><td>Bateria de 12 V</td><td><code>VS</code> / <code>U12P</code> da CSC</td><td>Faixa de 4,75 a 60 V <span class="cit">[DS12, PRQ-518/519, p. 12]</span></td></tr>
+  <tr><td>PB1 da Nucleo</td><td>MOSFET do shutdown</td><td>Seção 10</td></tr>
 </tbody>
 </table>
 
 <div class="aviso">
-  <div class="rot">Aten&ccedil;&atilde;o</div>
-  O watchdog interno do TLE9012 <strong>reseta o NODE_ID</strong> se n&atilde;o for alimentado dentro do intervalo
-  configurado (WDOG_CNT.WD_CNT), inclusive durante a pr&oacute;pria inicializa&ccedil;&atilde;o da cadeia. O tick de
-  <em>watchdog kick</em> precisa existir desde a fase 1, antes mesmo de qualquer leitura de tens&atilde;o.
+  <div class="rot">O VIO não é opcional</div>
+  O TLE9015 tem duas alimentações: <code>VS</code> para o CI e <code>VIO</code> só para a interface UART.
+  Com o <code>VIO</code> solto, o datasheet é claro: abaixo de 2,2 a 2,76 V a <em>UART interface is
+  deactivated</em> <span class="cit">[DS15, Fig. 4, p. 11; PRQ-546, p. 12]</span>. O sintoma é traiçoeiro:
+  o transceiver continua vivo do lado da iso UART e surdo do lado do STM32, e o sistema só voltava quando
+  eu desplugava e replugava o cabo. Não é firmware. Liguei o <code>VIO</code> no 3V3 da Nucleo e resolveu.
 </div>
 
 <div class="nota">
-  <div class="rot">Nota &mdash; caminho para ASIL</div>
-  Caso o BMS evolua para o AMS definitivo do ve&iacute;culo e seja exigido n&iacute;vel de integridade de seguran&ccedil;a
-  (lockstep, ASIL-D), o AURIX TC375 volta a ser candidato. A decis&atilde;o pode ser adiada sem custo desde que
-  o isolamento de transporte descrito acima seja respeitado desde a fase 1.
+  <div class="rot">Por que a ligação é cruzada</div>
+  O TLE9015 e o TLE9012 têm dois lados de iso UART, alto (H) e baixo (L), e a mensagem entra por um lado
+  e sai pelo outro. Ligar L com L não forma caminho. Com o STM32 no <code>UART_LS</code>, a mensagem sai
+  pelo lado alto do transceiver, então o conector HS vai no lado L da CSC. É o modo <em>primary on
+  bottom</em> do datasheet <span class="cit">[DS15, seç. 6.1, p. 16]</span>.
 </div>
 
-<!-- ========== 7. ESTRUTURA DE DIRETORIOS ========== -->
-<h2 id="s7">7. Estrutura de Diret&oacute;rios do Projeto</h2>
+<!-- ===================================================== 6 -->
+<h2 id="s6">6. Comunicação com o TLE9012</h2>
 
-<div class="arq">
-bms_tle9012/
-+-- docs/
-|   +-- relatorio_estrutura_software_bms.html
-|   +-- relatorio_estrutura_software_bms.pdf
-|   +-- infineon-...-usermanual-en.pdf
-|
-+-- bootloader/                  (projeto STM32CubeIDE separado)
-|   +-- Core/Src/
-|   |   +-- main.c               bootloader main
-|   |   +-- can_boot.c/h         protocolo CAN de atualizacao
-|   |   +-- flash_if.c/h         interface flash (erase/write/verify)
-|   +-- STM32G491RETX_FLASH.ld   linker: ORIGIN = 0x08000000, LENGTH = 16K
-|
-+-- app/                         (projeto STM32CubeIDE principal)
-|   +-- Core/Src/
-|   |   +-- main.c
-|   |   +-- tle9012.c/h
-|   |   +-- tle9015.c/h
-|   |   +-- crc_j1850.c/h
-|   |   +-- params.c/h
-|   |   +-- protection.c/h
-|   |   +-- balancing.c/h
-|   |   +-- can_app.c/h
-|   |   +-- bsp.c/h
-|   +-- STM32G491RETX_FLASH.ld   linker: fases 1-3 -> ORIGIN = 0x08000000
-|                                        fase 4    -> ORIGIN = 0x08004000, LENGTH = 480K
-|
-+-- tools/
-    +-- flash_tool.py            script Python para envio de firmware via CAN
-    +-- param_tool.py            script Python para configurar parametros via CAN
-</div>
+<h3>Parâmetros da UART</h3>
+<p><strong>2 Mbit/s, 8 bits, sem paridade, 1 stop bit, bit mais significativo primeiro.</strong> O TLE9015
+aceita de 0,97 a 3 Mbit/s, com 2 Mbit/s típico <span class="cit">[DS15, PRQ-723, p. 17]</span>. Errei isso
+no começo: usei 115200, que é a velocidade de um terminal serial comum, e nada respondia.</p>
 
-<!-- ========== 8. FLUXO DE ATUALIZACAO ========== -->
-<h2 id="s8">8. Fluxo de Atualiza&ccedil;&atilde;o em Campo</h2>
-
-<h3>8.1 Atualiza&ccedil;&atilde;o de Firmware (via bootloader CAN)</h3>
-<ol>
-  <li>Conectar adaptador CAN-USB ao barramento (ex: PCAN-USB, CANable)</li>
-  <li>Executar <code>flash_tool.py --port CAN0 --file app.bin</code></li>
-  <li>O script envia comando ENTER_BOOTLOADER &rarr; a aplica&ccedil;&atilde;o seta flag em RAM e reseta</li>
-  <li>Bootloader apaga, grava e verifica a nova imagem</li>
-  <li>MCU reinicia na nova aplica&ccedil;&atilde;o</li>
-</ol>
-
-<h3>8.2 Atualiza&ccedil;&atilde;o de Par&acirc;metros (sem bootloader)</h3>
-<ol>
-  <li>Executar <code>param_tool.py --port CAN0 --config params.json</code></li>
-  <li>O script serializa a struct e envia via mensagens CAN segmentadas</li>
-  <li>A aplica&ccedil;&atilde;o grava na flash e reinicia com os novos valores</li>
-</ol>
-
-<div class="decisao">
-  <div class="rot">Vantagem</div>
-  <div class="peca">Zero recompila&ccedil;&atilde;o</div>
-  <p>Para mudar de 12 c&eacute;lulas para 8, ou de OV 4,2 V para 4,15 V, basta editar o <code>params.json</code> e rodar o script. N&atilde;o &eacute; necess&aacute;rio IDE, compilador ou programador.</p>
-</div>
-
-<!-- ========== 9. REFERENCIAS ========== -->
-<h2 id="s9b">9. Valida&ccedil;&atilde;o em Bancada</h2>
-
-<p>A fase 1 foi levantada em bancada em 2026-08-26, com bateria de 12,67 V no ladder
-resistivo da placa de avalia&ccedil;&atilde;o. As 12 c&eacute;lulas leram <strong>1056 mV</strong> cada,
-consistente com 12670/12. Isso validou em hardware, de uma vez: baudrate de 2 Mbit/s,
-ordem MSB-first, formato dos frames, CRC8 e CRC3, atribui&ccedil;&atilde;o de NODE_ID, mapa de
-registradores e a f&oacute;rmula de convers&atilde;o.</p>
-
-<p>As sete armadilhas abaixo custaram tempo real de bancada. Nenhuma delas &eacute; &oacute;bvia na
-documenta&ccedil;&atilde;o, e v&aacute;rias produzem sintomas que apontam para o lugar errado.</p>
-
-<h3>9.1 Alimenta&ccedil;&atilde;o: VS e VIO s&atilde;o trilhos independentes</h3>
-
-<div class="regra">
-  <div class="rot">A armadilha mais cara</div>
-  <code>VS</code> (pino 34) alimenta o n&uacute;cleo do TLE9015. <code>VIO</code> (pino 30) alimenta
-  <strong>exclusivamente a interface UART</strong> e define seus n&iacute;veis l&oacute;gicos. S&atilde;o
-  independentes e <strong>ambos obrigat&oacute;rios</strong>.
-  <p>Com o <code>VIO</code> flutuando, a Figura 4 do datasheet &eacute; expl&iacute;cita:
-  <code>V_VIO &lt; V_VIO_th_UV</code> (2,2 a 2,76 V) &rarr; <em>&ldquo;UART interface is
-  deactivated&rdquo;</em>.</p>
-  <p><strong>Sintoma observado:</strong> o transceiver fica vivo do lado da iso UART e surdo do
-  lado do MCU. O sistema n&atilde;o sobe sozinho ap&oacute;s ciclar a energia do transceiver e s&oacute;
-  volta ao <strong>desplugar e replugar o cabo iso UART</strong> &mdash; porque isso gera transiente
-  no &uacute;nico lado que ainda funciona. Nenhuma corre&ccedil;&atilde;o de firmware resolve, porque o
-  firmware fala justamente pela interface desativada. E o comportamento &eacute;
-  <strong>intermitente</strong>, n&atilde;o morto: pino de alimenta&ccedil;&atilde;o solto flutua perto do
-  limiar por caminhos parasitas.</p>
-</div>
-
-<table>
-<thead>
-  <tr><td>Pino</td><td>Faixa funcional</td><td>Alimentar com</td></tr>
-</thead>
-<tbody>
-  <tr><td class="id">VS (TLE9015)</td><td class="num">4,75 &ndash; 45 V</td><td>Pino <code>5V</code> da Nucleo</td></tr>
-  <tr class="destaque"><td class="id">VIO (TLE9015)</td><td class="num">3 &ndash; 5,5 V</td><td>Pino <code>3V3</code> da Nucleo</td></tr>
-  <tr><td class="id">VS / U12P (TLE9012)</td><td class="num">4,75 &ndash; 60 V</td><td>Fonte isolada no ladder</td></tr>
-</tbody>
-</table>
-
-<p>Alimentar o <code>VIO</code> com 3,3 V tem um b&ocirc;nus: os pinos UART passam a chavear
-exatamente no n&iacute;vel do <code>PC4</code>/<code>PC5</code>, melhor do que deixar o
-<code>VREGOUT</code> interno aliment&aacute;-lo com 3,45 V.</p>
-
-<h3>9.2 A liga&ccedil;&atilde;o transceiver&harr;sensing &eacute; cruzada</h3>
-
-<p>O sinal entra numa CSC por uma interface e sai pela outra, ent&atilde;o lado igual nos dois
-extremos n&atilde;o tem caminho. Com o MCU no <code>UART_LS</code>, a se&ccedil;&atilde;o 5.1 do datasheet
-estabelece que os dados saem por <code>IFH</code> &mdash; o conector <code>HS</code>.</p>
-
-<table>
-<thead>
-  <tr><td>Transceiver</td><td>Sensing</td><td>V&aacute;lido</td></tr>
-</thead>
-<tbody>
-  <tr><td class="id">LS (IFL)</td><td class="id">H P / H N</td><td class="sim">Primary on Top</td></tr>
-  <tr class="destaque"><td class="id">HS (IFH)</td><td class="id">L P / L N</td><td class="sim">Primary on Bottom &mdash; validado</td></tr>
-  <tr><td class="id">LS</td><td class="id">L P / L N</td><td class="nao">sem caminho</td></tr>
-  <tr><td class="id">HS</td><td class="id">H P / H N</td><td class="nao">sem caminho</td></tr>
-</tbody>
-</table>
-
-<h3>9.3 Watchdog derruba o link sem aviso</h3>
-
-<p>O campo <code>WD_CNT</code> do <code>WDOG_CNT</code> (0x3D) decrementa sozinho. Ao chegar em
-<code>0x00</code>, o TLE9012 <strong>entra em sleep e reseta o NODE_ID para 0</strong>. A partir
-da&iacute;, toda transa&ccedil;&atilde;o endere&ccedil;ada ao n&oacute; antigo d&aacute; timeout, sem nenhum outro
-sintoma.</p>
-
-<p>Observado em bancada como: a cadeia sobe, l&ecirc; corretamente por um tempo, e ent&atilde;o
-<code>meas_count</code> congela enquanto <code>meas_fail_count</code> sobe indefinidamente
-&mdash; mesmo com toda a alimenta&ccedil;&atilde;o presente. O firmware recarrega o contador a cada
-ciclo de medi&ccedil;&atilde;o e logo ap&oacute;s atribuir o NODE_ID.</p>
-
-<h3>9.4 Recupera&ccedil;&atilde;o exige reset expl&iacute;cito</h3>
-
-<p><code>tle9012_assign_node_id()</code> escreve no n&oacute; 0, que &eacute; como se endere&ccedil;a um
-IC ainda n&atilde;o configurado. Se o TLE9012 retiver o <code>NODE_ID</code> de uma sess&atilde;o
-anterior, n&atilde;o existe mais ningu&eacute;m no n&oacute; 0 e a reinicializa&ccedil;&atilde;o falha para sempre.</p>
-
-<p>A se&ccedil;&atilde;o 3.6.2 do manual traz o procedimento: escrever <code>SLEEP_REG_RESET</code>
-(<code>OP_MODE</code> = <code>0xC404</code>), aguardar 4 ms e acordar com um comando de leitura.
-O dispositivo volta em <code>NODE_ID = 0</code>.</p>
-
-<h3>9.5 Formato da rajada de multiread</h3>
-
-<p>O manual documenta os registradores <code>MULTI_READ</code> (0x31) e
-<code>MULTI_READ_CFG</code> (0x32), mas <strong>n&atilde;o descreve o frame de resposta</strong>. O
-layout abaixo foi determinado observando a rajada real em bancada:</p>
-
-<div class="arq">
-Total: 64 bytes para 12 celulas
-
-  [0..3]    eco do pedido de leitura (1E ID 31 CRC)
-  [4..8]    frame da celula 11   \
-  [9..13]   frame da celula 10    |  12 frames de 5 bytes:
-  ...                             |  SYNC | ID | DATA_H | DATA_L | CRC8
-  [59..63]  frame da celula 0    /   CRC cobre os 4 bytes anteriores
-</div>
-
-<div class="aviso">
-  <div class="rot">N&atilde;o verificado</div>
-  A <strong>ordem</strong> das c&eacute;lulas segue a descri&ccedil;&atilde;o do campo
-  <code>PCVM_SEL = 0xC</code> no manual, <em>&ldquo;Result of Cell 11-0&rdquo;</em> &mdash; decrescente.
-  Com ladder resistivo todas as c&eacute;lulas leem igual, o que torna ordem certa e invertida
-  <strong>indistinguiveis</strong>. Confirmar com fonte desbalanceada ou c&eacute;lulas reais antes de
-  confiar: &eacute; um erro que s&oacute; se manifesta quando o pack desbalanceia, que &eacute; exatamente
-  quando o BMS precisa acertar.
-</div>
-
-<h3>9.6 Dado obsoleto se passando por atual</h3>
-
-<div class="regra">
-  <div class="rot">Defeito pr&oacute;prio, corrigido</div>
-  A primeira vers&atilde;o do la&ccedil;o de medi&ccedil;&atilde;o retornava no caminho de erro sem tocar no
-  snapshot. Ao desligar a fonte da sensing board, <code>meas_fail_count</code> subia mas
-  <code>cell_mv</code> continuava exibindo 1056 mV indefinidamente.
-  <p>Num BMS esse &eacute; o pior tipo de defeito: agir sobre tens&atilde;o obsoleta acreditando que
-  &eacute; atual. A corre&ccedil;&atilde;o introduziu <code>cell_data_valid</code> e
-  <code>cell_data_age_ms</code>. <strong>Nenhuma camada superior pode usar <code>cell_mv</code>
-  sem conferir <code>cell_data_valid</code> antes</strong> &mdash; e isso vale tamb&eacute;m para o
-  CAN: transmitir leitura de dez minutos atr&aacute;s como se fosse atual &eacute; pior que n&atilde;o
-  transmitir nada.</p>
-</div>
-
-<h3>9.7 Tempo de convers&atilde;o por polling</h3>
-
-<p>O bit <code>PCVM_START</code> (<code>MEAS_CTRL</code> bit 15, tipo <code>rwh</code>) &eacute;
-limpo pelo hardware ao final da convers&atilde;o &mdash; <em>&ldquo;Bit cleared if conversion
-done&rdquo;</em>. Fazer polling desse bit substitui o atraso fixo arbitrado, com dois ganhos: a
-leitura sai assim que fica pronta, e uma convers&atilde;o que n&atilde;o conclui vira erro expl&iacute;cito
-em vez de dado lido cedo demais.</p>
-
-<h2 id="s10">10. Diagn&oacute;stico e Prote&ccedil;&otilde;es</h2>
-
-<h3 id="s101">10.1 C&oacute;digo de falha</h3>
-
-<p>M&aacute;scara de bit &eacute; ileg&iacute;vel em depurador. A vari&aacute;vel <code>fault_code</code> &eacute; de
-tipo <code>enum</code>, e o Live Expressions do CubeIDE exibe o <strong>nome</strong> do
-enumerado em vez do n&uacute;mero. Ao lado, <code>fault_cell</code> indica a c&eacute;lula ou canal
-afetado (<code>0xFF</code> quando a falha n&atilde;o &eacute; por c&eacute;lula).</p>
-
-<p>A ordem &eacute; de <strong>prioridade</strong>, n&atilde;o de ocorr&ecirc;ncia: a falha mais grave ativa
-vence. Perda de comunica&ccedil;&atilde;o vem antes de tudo porque, sem dado, nenhuma outra
-prote&ccedil;&atilde;o significa nada. Sobretens&atilde;o vem antes de subtens&atilde;o porque sobrecarga tem
-consequ&ecirc;ncia t&eacute;rmica, enquanto subtens&atilde;o apenas degrada.</p>
-
-<table>
-<thead>
-  <tr><td>Prio</td><td>C&oacute;digo</td><td>Origem</td><td>Significado</td></tr>
-</thead>
-<tbody>
-  <tr><td class="num">1</td><td class="id">BMS_FAULT_CHAIN_DOWN</td><td>firmware</td><td>Cadeia caiu, sem comunica&ccedil;&atilde;o</td></tr>
-  <tr><td class="num">2</td><td class="id">BMS_FAULT_DATA_STALE</td><td>firmware</td><td>Medi&ccedil;&atilde;o obsoleta</td></tr>
-  <tr class="destaque"><td class="num">3</td><td class="id">BMS_FAULT_CELL_OV</td><td>hardware</td><td>Sobretens&atilde;o de c&eacute;lula</td></tr>
-  <tr class="destaque"><td class="num">4</td><td class="id">BMS_FAULT_CELL_UV</td><td>hardware</td><td>Subtens&atilde;o de c&eacute;lula</td></tr>
-  <tr><td class="num">5</td><td class="id">BMS_FAULT_EXT_OVERTEMP</td><td>hardware</td><td>Sobretemperatura no NTC</td></tr>
-  <tr><td class="num">6</td><td class="id">BMS_FAULT_INT_OVERTEMP</td><td>hardware</td><td>Sobretemperatura interna do CI</td></tr>
-  <tr><td class="num">7</td><td class="id">BMS_FAULT_UNDERTEMP</td><td><strong>firmware</strong></td><td>Subtemperatura &mdash; o CI n&atilde;o detecta</td></tr>
-  <tr><td class="num">8</td><td class="id">BMS_FAULT_OPEN_LOAD</td><td>hardware</td><td>Fio de sensoriamento aberto</td></tr>
-  <tr><td class="num">9</td><td class="id">BMS_FAULT_ADC</td><td>hardware</td><td>Soma dos PCVM diverge do BVM</td></tr>
-  <tr><td class="num">10</td><td class="id">BMS_FAULT_INTERNAL_IC</td><td>hardware</td><td>Erro interno do TLE9012</td></tr>
-  <tr><td class="num">11</td><td class="id">BMS_FAULT_REG_CRC</td><td>hardware</td><td>CRC de registrador</td></tr>
-  <tr><td class="num">12</td><td class="id">BMS_FAULT_PS_SLEEP</td><td>hardware</td><td>Sleep por erro de alimenta&ccedil;&atilde;o</td></tr>
-  <tr><td class="num">13</td><td class="id">BMS_FAULT_BALANCING</td><td>hardware</td><td>Corrente de balanceamento fora do previsto</td></tr>
-</tbody>
-</table>
-
-<div class="aviso">
-  <div class="rot">Hardware ou firmware &mdash; a distin&ccedil;&atilde;o importa</div>
-  As falhas marcadas <strong>hardware</strong> s&atilde;o detectadas pelo pr&oacute;prio TLE9012 e
-  continuam valendo mesmo se o firmware travar. A <strong>subtemperatura</strong> &eacute; a
-  &uacute;nica detectada s&oacute; em firmware, porque o CI n&atilde;o possui limiar de frio &mdash; existe
-  apenas <code>EXT_OT_THR</code>, para o lado quente. Uma prote&ccedil;&atilde;o que depende do
-  firmware rodando &eacute; estruturalmente mais fraca, e isso deve ser declarado.
-</div>
-
-<h3 id="s102">10.2 Bits do GEN_DIAG (0x0B)</h3>
-
-<table>
-<thead>
-  <tr><td>Bit</td><td>M&aacute;scara</td><td>Campo</td><td>Significado</td></tr>
-</thead>
-<tbody>
-  <tr><td class="num">0</td><td class="id">0x0001</td><td>UART_WAKEUP</td><td>status &mdash; origem do wake-up</td></tr>
-  <tr><td class="num">1</td><td class="id">0x0002</td><td>MOT_MOB_N</td><td>status &mdash; 0 = PoB, 1 = PoT</td></tr>
-  <tr><td class="num">2</td><td class="id">0x0004</td><td>BAL_ACTIVE</td><td>status &mdash; balanceamento em curso</td></tr>
-  <tr><td class="num">3</td><td class="id">0x0008</td><td>LOCK_MEAS</td><td>status &mdash; medi&ccedil;&atilde;o em curso</td></tr>
-  <tr><td class="num">4</td><td class="id">0x0010</td><td>RR_ACTIVE</td><td>status &mdash; round robin ativo</td></tr>
-  <tr><td class="num">5</td><td class="id">0x0020</td><td>PS_ERR_SLEEP</td><td>sleep por erro de alimenta&ccedil;&atilde;o</td></tr>
-  <tr><td class="num">6</td><td class="id">0x0040</td><td>ADC_ERR</td><td>soma dos PCVM diverge do BVM</td></tr>
-  <tr><td class="num">7</td><td class="id">0x0080</td><td>OL_ERR</td><td>open load</td></tr>
-  <tr><td class="num">8</td><td class="id">0x0100</td><td>INT_IC_ERR</td><td>erro interno do CI</td></tr>
-  <tr><td class="num">9</td><td class="id">0x0200</td><td>REG_CRC_ERR</td><td>CRC de registrador</td></tr>
-  <tr><td class="num">10</td><td class="id">0x0400</td><td>EXT_T_ERR</td><td>sobretemperatura externa</td></tr>
-  <tr><td class="num">11</td><td class="id">0x0800</td><td>INT_OT</td><td>sobretemperatura interna</td></tr>
-  <tr><td class="num">12</td><td class="id">0x1000</td><td>CELL_UV</td><td>resumo de subtens&atilde;o</td></tr>
-  <tr><td class="num">13</td><td class="id">0x2000</td><td>CELL_OV</td><td>resumo de sobretens&atilde;o</td></tr>
-  <tr><td class="num">14</td><td class="id">0x4000</td><td>BAL_ERR_UC</td><td>subcorrente de balanceamento</td></tr>
-  <tr><td class="num">15</td><td class="id">0x8000</td><td>BAL_ERR_OC</td><td>sobrecorrente de balanceamento</td></tr>
-</tbody>
-</table>
-
-<div class="nota">
-  <div class="rot">Nota</div>
-  <strong>Os bits 0 a 4 s&atilde;o status de opera&ccedil;&atilde;o, n&atilde;o erro.</strong> Ver
-  <code>0x0010</code> no <code>GEN_DIAG</code> significa apenas que o round robin est&aacute;
-  rodando. Por isso o acumulador <code>fault_latched</code> mascara com
-  <code>0xFFE0</code>, guardando s&oacute; do bit 5 para cima.
-</div>
-
-<h3 id="s103">10.3 M&aacute;scaras por c&eacute;lula</h3>
-
-<p>Os registradores <code>CELL_UV</code> (0x0C) e <code>CELL_OV</code> (0x0D) trazem um bit por
-c&eacute;lula, nos bits 0 a 11: <strong>bit <em>i</em> = c&eacute;lula <em>i</em></strong>.</p>
-
-<table>
-<thead>
-  <tr><td>Valor</td><td>Significa</td></tr>
-</thead>
-<tbody>
-  <tr><td class="id">0x0001</td><td>somente a c&eacute;lula 0</td></tr>
-  <tr><td class="id">0x0800</td><td>somente a c&eacute;lula 11</td></tr>
-  <tr><td class="id">0x0FFF</td><td>todas as 12</td></tr>
-</tbody>
-</table>
-
-<p>Com o ladder resistivo todas as c&eacute;lulas leem igual, ent&atilde;o uma inje&ccedil;&atilde;o de UV ou OV
-acende <strong>todas de uma vez</strong>: espera-se <code>0x0FFF</code>.</p>
-
-<h4>Identifica&ccedil;&atilde;o do escravo</h4>
-
-<p>Cada CSC da cadeia tem seu pr&oacute;prio <code>NODE_ID</code> e seus pr&oacute;prios registradores de
-diagn&oacute;stico &mdash; a leitura j&aacute; &eacute; endere&ccedil;ada por n&oacute;, ent&atilde;o distinguir de qual
-escravo veio a falha &eacute; imediato. A vari&aacute;vel <code>fault_node</code> registra isso.</p>
-
-<div class="aviso">
-  <div class="rot">Limita&ccedil;&atilde;o atual</div>
-  O firmware &eacute; <strong>single-slave</strong>: tudo est&aacute; fixado em
-  <code>BMS_NODE_ID = 1</code>. Suportar N escravos exige transformar os snapshots
-  (<code>cell_mv</code>, <code>fault_uv</code>, <code>temp_ohms</code>&hellip;) em matrizes
-  indexadas por n&oacute; e iterar a inicializa&ccedil;&atilde;o at&eacute; o &uacute;ltimo IC, marcando apenas ele
-  como <em>final node</em>. O driver j&aacute; recebe <code>node_id</code> em todas as fun&ccedil;&otilde;es;
-  a mudan&ccedil;a &eacute; de camada de aplica&ccedil;&atilde;o.
-</div>
-
-<h3 id="s104">10.4 Histerese</h3>
-
-<p>Os flags <code>CELL_UV</code> e <code>CELL_OV</code> s&atilde;o do tipo <code>rocw</code>:
-uma vez setados, permanecem at&eacute; algu&eacute;m escrever <code>0</code> na posi&ccedil;&atilde;o. Ou seja,
-<strong>quando limpar &eacute; decis&atilde;o do firmware</strong> &mdash; e limpar assim que a tens&atilde;o
-volta a cruzar o limiar produziria oscila&ccedil;&atilde;o cont&iacute;nua com a c&eacute;lula parada em cima
-dele.</p>
-
-<div class="arq">
-UV   seta em UV_THR          ->  limpa so acima de   UV_THR + 200 mV
-OV   seta em OV_THR          ->  limpa so abaixo de  OV_THR - 200 mV
-</div>
-
-<p>Tr&ecirc;s propriedades deliberadas:</p>
-
+<p>Três escolhas saíram desses parâmetros:</p>
 <ul>
-  <li><strong>A falha sempre seta no limiar exato.</strong> A histerese atrasa apenas a
-      recupera&ccedil;&atilde;o, nunca a detec&ccedil;&atilde;o.</li>
-  <li><strong>S&oacute; limpa com <code>cell_data_valid = 1</code>.</strong> Dado obsoleto nunca
-      pode justificar sair de um estado de falha.</li>
-  <li><strong>A limpeza &eacute; por c&eacute;lula.</strong> A c&eacute;lula 3 pode sair de falha sem apagar
-      a da c&eacute;lula 7 &mdash; o que importa num pack real, onde as c&eacute;lulas divergem.</li>
+  <li><strong>Um fio só.</strong> TX e RX se encontram no mesmo pino do transceiver (<code>UART_LS</code>), então o STM32 recebe
+      de volta tudo o que transmite (o eco). O driver descarta o eco antes de ler a resposta.</li>
+  <li><strong>MSB primeiro, em hardware.</strong> A UART comum manda o bit menos significativo primeiro; o
+      TLE9012 espera o contrário. O USART do STM32 tem um bit de configuração para isso
+      (<em>MSB First</em>), então não preciso inverter bits por software.</li>
+  <li><strong>DMA na transmissão e na recepção.</strong> A 2 Mbit/s cada byte dura 5 µs, e os bytes de uma
+      mensagem precisam sair colados. Por isso a transmissão vai por DMA, e a recepção fica num DMA circular
+      que nunca para de ouvir, para não perder a resposta que chega logo depois do eco.</li>
+</ul>
+
+<h3>Mensagens</h3>
+<p>Toda mensagem começa com o byte de sincronismo <code>0x1E</code> e termina com um CRC
+<span class="cit">[UM, seç. 3.1, p. 49&ndash;52]</span>:</p>
+
+<table>
+<thead><tr><td>Operação</td><td>STM32 envia</td><td>STM32 recebe</td></tr></thead>
+<tbody>
+  <tr><td>Escrita</td><td>6 bytes: <code>1E | ID | endereço | dado (2) | CRC8</code></td><td>6 de eco + 1 byte de confirmação</td></tr>
+  <tr><td>Leitura</td><td>4 bytes: <code>1E | ID | endereço | CRC8</code></td><td>4 de eco + 5 de resposta</td></tr>
+</tbody>
+</table>
+
+<p>São dois CRCs. O <strong>CRC8</strong> protege as mensagens e segue o SAE-J1850
+(polinômio <code>z⁸+z⁴+z³+z²+1</code>, valor inicial <code>FF</code>, XOR final <code>FF</code>)
+<span class="cit">[UM, seç. 3.1.1, p. 51]</span>. O <strong>CRC3</strong> protege o byte de confirmação da
+escrita; ele não está explicado no manual, e tirei da biblioteca de referência
+<span class="cit">[LIB]</span>. Os dois foram confirmados em bancada. Calculo bit a bit, sem tabela: a
+mensagem tem no máximo 5 bytes, e a conta leva menos de 1 µs.</p>
+
+<h3>Inicialização da cadeia</h3>
+<ol>
+  <li>Acordar a cadeia.</li>
+  <li>Dar um endereço (<code>NODE_ID</code>) a cada TLE9012, começando pelo mais próximo do transceiver
+      <span class="cit">[UM, Tab. 7&ndash;10, p. 49&ndash;50]</span>.</li>
+  <li>Marcar o último como <em>final node</em>; sem isso, comandos em broadcast não recebem resposta
+      <span class="cit">[UM, CONFIG.FN, p. 109]</span>.</li>
+  <li>Recarregar o watchdog do TLE9012 desde o primeiro instante.</li>
+</ol>
+
+<div class="regra">
+  <div class="rot">O watchdog derruba o link sem aviso</div>
+  Se o contador <code>WD_CNT</code> chega a zero, o TLE9012 dorme e volta para <code>NODE_ID = 0</code>
+  <span class="cit">[UM, seç. 3.1, p. 49]</span>. Daí em diante toda mensagem dá timeout, sem nenhum outro
+  sintoma. Em bancada, a leitura funcionava por um tempo e parava. O firmware recarrega o watchdog a cada
+  ciclo de medição.
+</div>
+
+<p>Se o TLE9012 ficar com um endereço de uma sessão anterior, a reinicialização falha, porque ela fala
+com o nó 0. A saída é o reset de registradores pelo bit <code>SLEEP_REG_RESET</code>, que devolve o CI ao
+estado de fábrica <span class="cit">[UM, seç. 3.6.2, p. 59]</span>. O firmware faz isso sozinho quando
+perde a cadeia.</p>
+
+<h3>Driver separado do hardware</h3>
+<p>O arquivo <code>tle9012.c</code> não chama a HAL do STM32. Ele recebe três funções de fora: enviar,
+receber e esperar. Assim o driver (mensagens, CRC, registradores, conversões) não depende do
+microcontrolador. Trocar de MCU, ou testar o driver no PC com respostas simuladas, exige reescrever só
+essas três funções.</p>
+
+<!-- ===================================================== 7 -->
+<h2 id="s7">7. Leitura das tensões</h2>
+
+<p>A cada ciclo, o firmware:</p>
+<ol>
+  <li>Manda o TLE9012 converter as 12 células.</li>
+  <li>Espera o fim da conversão olhando o bit <code>PCVM_START</code>, que o próprio CI zera quando termina
+      <span class="cit">[UM, MEAS_CTRL, p. 91]</span>. É melhor que esperar um tempo fixo: a leitura sai
+      assim que fica pronta, e uma conversão que não termina vira erro, em vez de dado lido cedo demais.</li>
+  <li>Lê as 12 tensões de uma vez, por <strong>multiread</strong>.</li>
+  <li>Converte: <code>V = 5 V &times; RESULT / 2¹⁶</code> <span class="cit">[UM, seç. 3.4.1, p. 57; DS12, PRQ-623, p. 26]</span>.</li>
+</ol>
+
+<p><strong>Multiread.</strong> Em vez de 12 leituras separadas, um comando só devolve todas as células
+<span class="cit">[UM, Tab. 27, p. 62; seç. 4.36&ndash;4.37, p. 104&ndash;105]</span>. A resposta tem 64 bytes:
+4 de eco e 12 blocos de 5 bytes, da célula 11 para a 0. O manual não descreve o formato dessa resposta;
+descobri olhando a rajada em bancada.</p>
+
+<div class="aviso">
+  <div class="rot">Falta verificar a ordem das células</div>
+  O manual diz que o multiread devolve da célula 11 para a 0 <span class="cit">[UM, MULTI_READ_CFG, p. 105]</span>.
+  Com o divisor resistivo, todas as células leem igual, então não dá para saber se a ordem está certa.
+  Preciso confirmar com uma fonte desbalanceada antes de confiar. Se estiver errada, a proteção atua na
+  célula errada justamente quando o pack desbalanceia.
+</div>
+
+<p><strong>Toda medição tem validade e idade.</strong> Na primeira versão, quando a leitura falhava, a
+tensão antiga continuava na tela como se fosse atual: desliguei a CSC e a tela seguia mostrando 1056 mV.
+Num BMS esse é o pior defeito possível, porque ele decide em cima de um dado velho achando que é novo. Hoje
+a leitura carrega uma marca de validade e a idade em milissegundos, e nenhuma proteção usa tensão
+inválida.</p>
+
+<p><strong>Resultado em bancada:</strong> com 12,67 V no divisor, as 12 células leram 1056 mV cada
+(12,67 V &divide; 12), de forma contínua. Isso validou de uma vez a velocidade, a ordem dos bits, as
+mensagens, os CRCs, o endereçamento e a fórmula de conversão.</p>
+
+<!-- ===================================================== 8 -->
+<h2 id="s8">8. Leitura das temperaturas</h2>
+
+<p>Cada TLE9012 mede até 5 termistores (NTC). A temperatura não é disparada como a tensão: o próprio CI
+mede em segundo plano, num ciclo automático chamado <em>round robin</em>, até dois termistores por volta
+<span class="cit">[UM, seç. 3.2.4, p. 54]</span>. Liguei o round robin ao watchdog (<code>RR_SYNC</code>):
+cada recarga do watchdog reinicia o ciclo <span class="cit">[UM, RR_CONFIG, p. 70]</span>. Como eu já recarrego
+o watchdog a cada 100 ms, ganhei o agendamento da temperatura de graça, sem usar timer.</p>
+
+<p>O CI entrega um número bruto (<code>RESULT</code>) e a corrente usada na medição (<code>INTC</code>).
+A resistência do NTC sai da fórmula do manual <span class="cit">[UM, seç. 3.4.2, p. 58]</span>:</p>
+<div class="arq">R_NTC = RESULT &times; 2 V &times; 4^INTC / (2¹⁰ &times; 320 µA) &minus; 100 Ω</div>
+<p>O fator <code>2 V / (2¹⁰ &times; 320 µA)</code> é exatamente <code>25000/4096</code>, então a conta é
+feita com inteiros, sem ponto flutuante e sem erro de arredondamento.</p>
+
+<div class="regra">
+  <div class="rot">A armadilha que mais custou tempo: I_NTC não é INTC</div>
+  São dois campos de nome parecido. <code>TEMP_CONF.I_NTC</code> é a corrente que eu configuro para a
+  <strong>comparação de sobretemperatura</strong> <span class="cit">[UM, TEMP_CONF, p. 67]</span>.
+  <code>EXT_TEMP.INTC</code> é a corrente que o CI usou na <strong>medição</strong>. O <code>RESULT</code>
+  muda 4 vezes a cada nível de corrente. Eu tinha configurado um nível e o CI media em outro, e a
+  sobretemperatura disparava com o NTC a 24 °C. <strong>Os dois têm que ser iguais.</strong> Só descobri
+  depois de três hipóteses erradas, quando li o registrador cru (<code>0x2244</code>). A lição: ler o
+  valor bruto antes de teorizar.
+</div>
+
+<div class="aviso">
+  <div class="rot">A placa de avaliação tem resistores nos canais de NTC</div>
+  Medi cerca de 5,2 kΩ nos cinco canais. O NTC fica em paralelo com eles, e um NTC de 10 kΩ lia 3,5 kΩ.
+  O esquemático da placa explica: são os resistores R109 a R113, de 5,1 kΩ, ligados aos canais por
+  jumpers de solda (X40 a X44) que vêm fechados de fábrica <span class="cit">[SCH, folha 3]</span>. Para ler o
+  NTC limpo basta abrir o jumper do canal. Enquanto isso, o firmware compensa o paralelo, mas é um
+  paliativo: o erro cresce no frio, e acima de 90% do valor do resistor o canal é marcado como inválido.
+  Na placa própria esses resistores não existem.
+</div>
+
+<p><strong>Só ligar os canais que têm NTC.</strong> A configuração ativa os canais em sequência a partir do
+primeiro; um canal ativo sem termistor acusa erro de <em>pull-down</em>, que aparece como falha de
+temperatura <span class="cit">[UM, EXT_TEMP, p. 97]</span>. Pino de termistor sem uso vai ao GND por um
+pull-down de mais de 10 kΩ <span class="cit">[DS12, seç. 2.2, p. 7]</span>. O manual manda ligar direto ao GND
+<span class="cit">[UM, seç. 2.1.6.1, p. 26]</span>, mas sigo o datasheet, que é mais novo (2023 contra 2022) e
+mantém a opção de usar o canal como entrada analógica. O mesmo vale para os GPIO0/1 sem uso: o datasheet
+manda ao GND direto <span class="cit">[DS12, p. 8]</span>, o manual por 33 kΩ.</p>
+
+<p><strong>Espera na partida.</strong> As primeiras medições, logo depois de ligar, acusam erros que não são
+reais, porque as fontes de corrente e os filtros ainda estão assentando. O firmware espera 500 ms
+(cinco voltas do round robin) e só então limpa as falhas.</p>
+
+<!-- ===================================================== 9 -->
+<h2 id="s9">9. Proteções</h2>
+
+<table>
+<thead><tr><td>Proteção</td><td>Quem detecta</td><td>Dispara em</td><td>Volta quando</td></tr></thead>
+<tbody>
+  <tr><td>Sobretensão</td><td>TLE9012</td><td>Limiar da célula</td><td>200 mV abaixo do limiar</td></tr>
+  <tr><td>Subtensão</td><td>TLE9012</td><td>Limiar da célula</td><td>200 mV acima do limiar</td></tr>
+  <tr><td>Sobretemperatura</td><td>TLE9012</td><td>60 °C (provisório)</td><td>55 °C</td></tr>
+  <tr><td>Subtemperatura</td><td>Firmware</td><td>5 °C</td><td>&mdash;</td></tr>
+  <tr><td>Fio de célula aberto</td><td>TLE9012</td><td>&mdash;</td><td>Sem histerese</td></tr>
+  <tr><td>NTC aberto ou em curto</td><td>TLE9012</td><td>&mdash;</td><td>Sem histerese</td></tr>
+  <tr><td>Perda de comunicação ou dado velho</td><td>Firmware</td><td>Timeout</td><td>Cadeia volta</td></tr>
+</tbody>
+</table>
+
+<p><strong>Por que a maioria fica no TLE9012.</strong> O que o próprio CI detecta continua valendo mesmo se o
+firmware travar. A subtemperatura é a exceção: o TLE9012 só tem limiar para o lado quente
+<span class="cit">[UM, TEMP_CONF, p. 67]</span>, então ela roda no STM32 e depende dele estar vivo. Ela também
+não é exigida pelo regulamento e fica desligada enquanto não houver termistor na bancada.</p>
+
+<p><strong>Por que histerese.</strong> Os indicadores de sub e sobretensão do TLE9012 ficam ligados até o
+firmware apagá-los <span class="cit">[UM, seç. 4.1, p. 61; CELL_UV, p. 77]</span>, então quem decide quando a
+falha acaba sou eu. Se eu apagasse assim que a tensão voltasse a cruzar o limiar, uma célula parada em
+cima dele ficaria entrando e saindo de falha sem parar. Então:</p>
+<ul>
+  <li>a falha <strong>sempre dispara no limiar exato</strong>; a histerese só atrasa a volta;</li>
+  <li>a falha só é apagada com <strong>leitura válida</strong>;</li>
+  <li>cada célula sai da falha <strong>sozinha</strong>, sem apagar a das outras;</li>
+  <li>além dos bits por célula, apago também o <strong>bit-resumo</strong> no registrador geral de
+      diagnóstico. Sem isso, a falha antiga continuava aparecendo para sempre (aconteceu em bancada).</li>
 </ul>
 
 <div class="regra">
-  <div class="rot">Armadilha: o bit-resumo &eacute; separado</div>
-  Limpar <code>CELL_UV</code> / <code>CELL_OV</code> <strong>n&atilde;o</strong> limpa os bits 12 e 13
-  do <code>GEN_DIAG</code>, que s&atilde;o resumos em registrador distinto. Sem limp&aacute;-los tamb&eacute;m,
-  o <code>GEN_DIAG</code> fica preso exibindo a falha antiga indefinidamente. Foi exatamente
-  esse o sintoma observado em bancada antes da corre&ccedil;&atilde;o.
+  <div class="rot">O limiar de sobretemperatura ainda não está conforme</div>
+  O regulamento pede temperatura abaixo de 60 °C <strong>considerando a exatidão da medição</strong>
+  <span class="cit">[FSAE, EV.8.5.2, p. 108]</span>, e a inspeção não dá tolerância
+  <span class="cit">[FSAE, IN.2.2.3, p. 115]</span>. Disparar em 60 °C exatos não atende. O limiar final
+  depende da exatidão do conjunto NTC + CI, que ainda vou levantar.
 </div>
 
-<h3 id="s105">10.5 Inje&ccedil;&atilde;o de falha para demonstra&ccedil;&atilde;o</h3>
+<p><strong>Uma falha de cada vez na tela.</strong> O firmware mostra a falha mais grave numa variável do tipo
+<code>enum</code>, que o depurador exibe pelo nome. A ordem é de gravidade: perda de comunicação vem
+primeiro (sem dado, nenhuma outra proteção vale), depois dado velho, sobretensão, subtensão,
+sobretemperatura e as demais. Junto vão o nó e a célula afetados.</p>
 
-<p>Seis modos, cicl&aacute;veis pelo bot&atilde;o azul da Nucleo &mdash; o que dispensa depurador durante
-uma inspe&ccedil;&atilde;o t&eacute;cnica. Tamb&eacute;m ajust&aacute;veis por <code>sim_request</code>.</p>
+<!-- ===================================================== 10 -->
+<h2 id="s10">10. Shutdown e sinalização</h2>
+
+<p>Um pino do STM32 (PB1) aciona o MOSFET que abre e fecha o shutdown circuit do carro.</p>
+
+<ul>
+  <li><strong>Nível alto fecha, nível baixo abre.</strong> Com um resistor de pull-down externo, se o
+      STM32 estiver desligado, em reset ou travado com o pino solto, o circuito fica aberto. Se fosse ao
+      contrário, um MCU morto liberaria o carro. O firmware põe o pino em baixo antes mesmo de configurá-lo
+      como saída.</li>
+  <li><strong>O shutdown trava aberto.</strong> Depois de abrir por falha, ele não fecha sozinho quando a
+      falha some. Só volta com uma ação de reset, que é ignorada enquanto houver falha ativa. O regulamento
+      exige reset manual, feito por uma pessoa junto ao carro <span class="cit">[FSAE, EV.8.2.3, p. 106]</span>,
+      então no carro isso vira um botão físico.</li>
+  <li><strong>Modo onda quadrada (opcional).</strong> Com o pino em nível fixo, um firmware travado
+      continua segurando o circuito fechado. No modo <code>BMS_SHUTDOWN_TOGGLE</code>, o pino fica
+      pulsando enquanto está tudo bem, e um diodo com RC só mantém o MOSFET ligado enquanto houver pulsos.
+      Se o MCU travar, os pulsos param e o circuito abre sozinho. Isso cobre a "falha no próprio BMS" que
+      o regulamento pede <span class="cit">[FSAE, EV.8.3.4e, p. 107]</span>.</li>
+  <li><strong>Caminho de erro por hardware.</strong> Habilitei todas as falhas para gerar o sinal de erro do
+      TLE9012 (EMM), que sobe pela iso UART até o pino de erro do TLE9015, sem passar pelo firmware
+      <span class="cit">[UM, FAULT_MASK, p. 72]</span>.</li>
+</ul>
+
+<p><strong>LED de bancada (LD2):</strong> piscando a 5 Hz significa vivo e sem falha; aceso fixo, falha
+ativa; apagado, firmware travado. Escolhi o pisca para indicar saúde porque, se apagado significasse
+"tudo bem", um firmware travado pareceria normal.</p>
+
+<!-- ===================================================== 11 -->
+<h2 id="s11">11. Como mostro que funciona</h2>
+
+<p>O regulamento exige demonstrar as funções do BMS na inspeção técnica
+<span class="cit">[FSAE, EV.8.1.7, p. 106]</span>. Para isso o firmware tem seis modos de injeção de
+falha, escolhidos pelo botão azul da Nucleo, sem precisar de depurador:</p>
 
 <table>
-<thead>
-  <tr><td>Modo</td><td>Como a condi&ccedil;&atilde;o &eacute; criada</td><td>GEN_DIAG esperado</td></tr>
-</thead>
+<thead><tr><td>Modo</td><td>Como a falha é criada</td></tr></thead>
 <tbody>
-  <tr><td class="id">UNDERVOLTAGE</td><td>Limiar de UV movido acima da tens&atilde;o medida</td><td class="id">0x1000</td></tr>
-  <tr><td class="id">OVERVOLTAGE</td><td>Limiar de OV movido abaixo da tens&atilde;o medida</td><td class="id">0x2000</td></tr>
-  <tr><td class="id">OVERTEMP</td><td>Limiar de OT no m&aacute;ximo</td><td class="id">0x0400</td></tr>
-  <tr><td class="id">OPEN_LOAD</td><td>Diagn&oacute;stico reabilitado com ladder resistivo</td><td class="id">0x0080</td></tr>
-  <tr><td class="id">COMM_LOSS</td><td>CI enviado para sleep</td><td>&mdash;</td></tr>
-  <tr><td class="id">UNDERTEMP</td><td>Limiar de firmware abaixo da leitura</td><td><strong>inalterado</strong></td></tr>
+  <tr><td class="id">UNDERVOLTAGE</td><td>Limiar de subtensão movido para cima da tensão medida</td></tr>
+  <tr><td class="id">OVERVOLTAGE</td><td>Limiar de sobretensão movido para baixo da tensão medida</td></tr>
+  <tr><td class="id">OVERTEMP</td><td>Limiar de sobretemperatura movido para baixo da temperatura medida</td></tr>
+  <tr><td class="id">OPEN_LOAD</td><td>Diagnóstico de fio aberto religado com o divisor resistivo</td></tr>
+  <tr><td class="id">COMM_LOSS</td><td>TLE9012 mandado dormir</td></tr>
+  <tr><td class="id">UNDERTEMP</td><td>Limiar de firmware movido para cima da temperatura medida</td></tr>
 </tbody>
 </table>
 
 <div class="decisao">
-  <div class="rot">Decis&atilde;o de projeto</div>
-  <div class="peca">Inje&ccedil;&atilde;o real, n&atilde;o flag forjado</div>
-  <p>Nenhum modo escreve em registrador de diagn&oacute;stico. Cada um cria uma
-  <strong>condi&ccedil;&atilde;o</strong> que o TLE9012 detecta pelo caminho normal &mdash; o caminho de
-  detec&ccedil;&atilde;o, os registradores e o intertravamento que desliga o balanceamento s&atilde;o os
-  mesmos de uma falha real. O que muda &eacute; a origem da condi&ccedil;&atilde;o, n&atilde;o a detec&ccedil;&atilde;o.</p>
-  <p>Forjar os flags acenderia o LED sem provar nada, e n&atilde;o sobreviveria a um avaliador
-  que pedisse para ver o <code>GEN_DIAG</code>. Declarar <em>&ldquo;o limiar foi deslocado, a
-  detec&ccedil;&atilde;o &eacute; real&rdquo;</em> &eacute; mais forte do que alegar falha genu&iacute;na.</p>
-  <p>Repare que <code>UNDERTEMP</code> deixa o <code>GEN_DIAG</code> intacto: &eacute; a confirma&ccedil;&atilde;o
-  vis&iacute;vel de que aquela prote&ccedil;&atilde;o &eacute; puramente de firmware.</p>
+  <div class="rot">Decisão</div>
+  <div class="peca">A falha é criada de verdade, não fingida</div>
+  <p>Nenhum modo escreve direto no registrador de falha. Cada um cria uma condição que o TLE9012 detecta
+  pelo caminho normal, então os registradores, o shutdown e o LED reagem como numa falha real. Fingir a
+  falha acenderia o LED sem provar nada, e não resistiria a um avaliador pedindo para ver o
+  registrador.</p>
 </div>
 
-<h3 id="s106">10.6 Sinaliza&ccedil;&atilde;o no LD2</h3>
-
+<h3>O que abrir no Live Expressions</h3>
+<p>Todo o estado está em seis structs. No depurador, cada assunto vira uma expressão só:</p>
 <table>
-<thead>
-  <tr><td>Estado do LED</td><td>Significado</td></tr>
-</thead>
+<thead><tr><td>Struct</td><td>O que mostra</td></tr></thead>
 <tbody>
-  <tr><td>Piscando a 5 Hz</td><td>Vivo e sem falha</td></tr>
-  <tr><td>Aceso fixo</td><td>Falha ativa</td></tr>
-  <tr><td>Apagado</td><td>Firmware travado</td></tr>
-</tbody>
-</table>
-
-<p>Sa&uacute;de sinalizada por <strong>pisca</strong>, e n&atilde;o por LED apagado, &eacute; deliberado: se apagado
-significasse &ldquo;tudo bem&rdquo;, firmware travado seria indistingu&iacute;vel de opera&ccedil;&atilde;o normal.
-Um AMS n&atilde;o pode ter estado de falha confund&iacute;vel com estado morto.</p>
-
-<p>A condi&ccedil;&atilde;o de acender cobre mais que os flags do CI: <strong>cadeia ca&iacute;da</strong> e
-<strong>dado obsoleto</strong> tamb&eacute;m acendem. Para um AMS, n&atilde;o saber a tens&atilde;o &eacute; t&atilde;o
-grave quanto saber que ela est&aacute; errada.</p>
-
-<h3 id="s107">10.7 Medi&ccedil;&atilde;o de temperatura</h3>
-
-<p>A temperatura n&atilde;o &eacute; disparada como a tens&atilde;o. Ela &eacute; medida pelo
-<strong>round robin</strong>, at&eacute; duas por ciclo (se&ccedil;&atilde;o 3.2.4 do manual). O firmware liga o
-round robin ao watchdog via <code>RR_CONFIG.RR_SYNC</code>: cada escrita no <code>WD_CNT</code>
-reinicia o RR, e como o watchdog j&aacute; &eacute; realimentado a cada 100 ms, o kick virou o agendador
-da temperatura sem custar um timer.</p>
-
-<p>A convers&atilde;o para ohms usa a f&oacute;rmula da se&ccedil;&atilde;o 3.4.2 em aritm&eacute;tica inteira exata:
-o fator <code>2 V / (2<sup>10</sup> &times; 320 &micro;A)</code> vale precisamente
-<code>25000/4096</code>, o que permite multiplica&ccedil;&atilde;o e deslocamento sem float e sem erro
-de arredondamento.</p>
-
-<div class="regra">
-  <div class="rot">A placa de avalia&ccedil;&atilde;o tem componentes nas posi&ccedil;&otilde;es NTC0..NTC4</div>
-  Medidos em bancada: <strong>~5,2 k&Omega; nos cinco canais</strong>, com dispers&atilde;o de 1,9%.
-  Um NTC externo fica em <strong>paralelo</strong> com eles, e a leitura resultante n&atilde;o &eacute; a
-  do sensor: um NTC de 10 k&Omega; lia 3,5 k&Omega;.
-  <p>O firmware compensa com
-  <code>R_ntc = (R_med &times; R_par) / (R_par &minus; R_med)</code>, mas isso &eacute;
-  <strong>paliativo</strong>. O denominador tende a zero conforme os dois se aproximam, e o erro
-  &eacute; amplificado justamente no frio &mdash; a 5 C o fator de amplifica&ccedil;&atilde;o j&aacute; &eacute; ~6&times;.
-  Uma guarda marca o canal como inv&aacute;lido acima de 90% de <code>R_PARALLEL</code>, em vez de
-  publicar n&uacute;mero sem significado. <strong>Dessoldar o componente da placa d&aacute; leitura limpa
-  e &eacute; sempre melhor.</strong></p>
-</div>
-
-<div class="aviso">
-  <div class="rot">Configurar s&oacute; os canais realmente ligados</div>
-  <code>NR_TEMP_SENSE</code> ativa uma <strong>sequ&ecirc;ncia</strong> a partir do TMP0, n&atilde;o canais
-  avulsos. Ativar canais sem NTC faz o teste de mux falhar neles, o que seta <code>PD_ERR</code> &mdash;
-  e <code>PD_ERR</code> est&aacute; ligado ao <code>EXT_T_ERR</code> do <code>GEN_DIAG</code>.
-  A constante <code>BMS_NUM_TEMP_USED</code> precisa bater com o hardware.
-</div>
-
-<h3 id="s108">10.8 Prote&ccedil;&otilde;es de temperatura</h3>
-
-<table>
-<thead>
-  <tr><td>Prote&ccedil;&atilde;o</td><td>Onde &eacute; detectada</td><td>Comparada contra</td></tr>
-</thead>
-<tbody>
-  <tr><td>Sobretemperatura</td><td><strong>Hardware</strong> (TLE9012)</td><td><code>RESULT</code> do ADC</td></tr>
-  <tr><td>Subtemperatura</td><td><strong>Firmware</strong> &mdash; o CI n&atilde;o possui</td><td>resist&ecirc;ncia em ohms</td></tr>
-  <tr><td>Fio aberto / curto</td><td><strong>Hardware</strong></td><td>&mdash;</td></tr>
-</tbody>
-</table>
-
-<p>N&atilde;o existe registrador de limiar frio no TLE9012: h&aacute; apenas <code>EXT_OT_THR</code>, para o
-lado quente. A subtemperatura roda no MCU, e por isso &eacute; estruturalmente mais fraca &mdash; depende
-do firmware estar vivo.</p>
-
-<div class="regra">
-  <div class="rot">A armadilha que custou mais tempo: I_NTC n&atilde;o &eacute; INTC</div>
-  S&atilde;o dois campos com nomes parecidos e pap&eacute;is diferentes:
-  <table>
-    <thead><tr><td>Campo</td><td>Onde</td><td>O que &eacute;</td></tr></thead>
-    <tbody>
-      <tr><td><code>TEMP_CONF.I_NTC</code></td><td>escrito</td><td>fonte usada na <strong>compara&ccedil;&atilde;o de OT</strong></td></tr>
-      <tr><td><code>EXT_TEMP_z.INTC</code></td><td>lido</td><td>fonte usada na <strong>medi&ccedil;&atilde;o</strong></td></tr>
-    </tbody>
-  </table>
-  <p>O <code>RESULT</code> escala por <strong>4 a cada n&iacute;vel</strong>. Configurar
-  <code>I_NTC = 1</code> com a medi&ccedil;&atilde;o rodando em <code>INTC = 0</code> faz a compara&ccedil;&atilde;o
-  acontecer contra um valor 4&times; menor que o reportado &mdash; e a sobretemperatura disparou com o
-  NTC a 24 C. <strong>Os dois t&ecirc;m que usar a mesma fonte.</strong></p>
-  <p>Diagnosticado lendo <code>EXT_TEMP_0 = 0x2244</code>: <code>VALID=1</code>,
-  <code>PD_ERR=0</code>, <code>INTC=0</code>, <code>RESULT=580</code>. Antes disso, tr&ecirc;s
-  hip&oacute;teses erradas foram testadas &mdash; a li&ccedil;&atilde;o de m&eacute;todo &eacute; ler o registrador cru
-  antes de teorizar sobre o mecanismo.</p>
-</div>
-
-<h4>Limiares</h4>
-
-<p>O <code>EXT_OT_THR</code> &eacute; comparado contra o <code>RESULT</code> bruto, n&atilde;o contra ohms
-nem graus, e dispara quando o resultado fica <strong>abaixo</strong> do limiar &mdash; porque a
-resist&ecirc;ncia do NTC cai com o calor.</p>
-
-<table>
-<thead>
-  <tr><td>Temperatura</td><td><code>RESULT</code> (INTC = 0)</td></tr>
-</thead>
-<tbody>
-  <tr><td class="num">45 C</td><td class="num">404</td></tr>
-  <tr><td class="num">50 C</td><td class="num">364</td></tr>
-  <tr class="destaque"><td class="num">55 C</td><td class="num">327 &mdash; retorno</td></tr>
-  <tr class="destaque"><td class="num">60 C</td><td class="num">292 &mdash; disparo</td></tr>
-  <tr><td class="num">65 C</td><td class="num">260</td></tr>
-  <tr><td class="num">70 C</td><td class="num">232</td></tr>
-</tbody>
-</table>
-
-<p><strong>Histerese de 5 C:</strong> dispara em <code>RESULT &lt; 292</code>, s&oacute; retorna em
-<code>RESULT &gt; 327</code>. Como o flag do CI &eacute; latching, o firmware tamb&eacute;m o limpa no
-dispositivo &mdash; sem isso ele reapareceria na leitura seguinte e a histerese n&atilde;o teria efeito.</p>
-
-<p>A struct espelha os limiares em <strong>graus</strong> (<code>ot_thr_c</code>,
-<code>ot_clear_c</code>, <code>ut_thr_c</code>), recalculados a cada ciclo com a fonte de corrente
-em uso &mdash; ent&atilde;o acompanham a inje&ccedil;&atilde;o de falha. Limiar e medi&ccedil;&atilde;o ficam na mesma
-unidade, lado a lado, que &eacute; o que torna uma demonstra&ccedil;&atilde;o leg&iacute;vel.</p>
-
-<h4>Diagn&oacute;stico de fio</h4>
-
-<p>O <code>EXT_TEMP_DIAG</code> (0x0E) traz <strong>tr&ecirc;s bits por canal</strong>, n&atilde;o um:
-<code>OPEN</code>, <code>SHORT</code> e <code>OT</code>, nas posi&ccedil;&otilde;es <code>3z</code>,
-<code>3z+1</code> e <code>3z+2</code>. Aberto e curto <strong>n&atilde;o</strong> levam histerese:
-s&atilde;o falha de fia&ccedil;&atilde;o, n&atilde;o grandeza anal&oacute;gica oscilando em torno de um limiar.</p>
-
-<h3 id="s109">10.9 Shutdown circuit</h3>
-
-<p>Um GPIO comanda o MOSFET que abre e fecha o shutdown circuit do ve&iacute;culo.</p>
-
-<div class="regra">
-  <div class="rot">Polaridade &mdash; o estado seguro tem que ser o estado n&atilde;o energizado</div>
-  <strong>N&iacute;vel ALTO fecha o circuito, BAIXO abre.</strong> Com pull-down externo no gate, MCU
-  desligado, em reset ou com o pino em alta imped&acirc;ncia deixa o circuito <strong>aberto</strong>.
-  A polaridade inversa produziria um sistema em que MCU morto = ve&iacute;culo liberado sem prote&ccedil;&atilde;o.
-  <p>O pull-down externo n&atilde;o &eacute; opcional: sem ele, o pino flutuante durante o reset pode
-  fechar o MOSFET por acaso. O firmware escreve n&iacute;vel baixo <em>antes</em> de configurar o pino
-  como sa&iacute;da, para n&atilde;o haver instante em alto durante o boot.</p>
-</div>
-
-<p><strong>O shutdown trava aberto.</strong> Uma vez aberto por falha, n&atilde;o fecha sozinho quando a
-condi&ccedil;&atilde;o some &mdash; recupera&ccedil;&atilde;o autom&aacute;tica deixaria o ve&iacute;culo se reenergizar ap&oacute;s
-um transiente. Destravar exige a&ccedil;&atilde;o expl&iacute;cita, e o pedido &eacute; <strong>ignorado se ainda
-houver falha</strong>, nunca enfileirado. No ve&iacute;culo isso deve ser um bot&atilde;o f&iacute;sico.</p>
-
-<div class="aviso">
-  <div class="rot">Limita&ccedil;&atilde;o do acionamento por n&iacute;vel est&aacute;tico</div>
-  N&iacute;vel est&aacute;tico <strong>n&atilde;o cobre travamento do MCU</strong>: um firmware travado continua
-  segurando o pino em alto e o circuito permanece fechado. A prote&ccedil;&atilde;o passa a depender do
-  supervisor estar vivo.
-  <p>O firmware traz a alternativa <code>BMS_SHUTDOWN_TOGGLE</code>: o pino vira <strong>onda
-  quadrada</strong> enquanto tudo est&aacute; ok, e um diodo com RC no gate mant&eacute;m o MOSFET conduzindo
-  s&oacute; enquanto houver pulsos. Se pararem &mdash; por travamento, reset ou perda de alimenta&ccedil;&atilde;o
-  &mdash; o RC descarrega e o circuito abre sozinho. Para um AMS de competi&ccedil;&atilde;o, &eacute; a forma
-  correta: cobre a falha do pr&oacute;prio supervisor.</p>
-</div>
-
-<p>Todas as falhas foram habilitadas a disparar EMM pelo <code>FAULT_MASK = 0xFFC0</code> (bits 6 a
-15 setados, <code>ERR_PIN = 0</code> mantendo o EMM ativo). O EMM sobe pela iso UART at&eacute; o
-TLE9015, que aciona <code>ERRQ</code> e <code>ERR_loc_out</code> &mdash; caminho de prote&ccedil;&atilde;o em
-hardware, independente do firmware.</p>
-
-<h3 id="s1010">10.10 Estado agrupado em structs</h3>
-
-<p>Todo o estado de runtime foi reorganizado em seis structs <code>volatile</code>. O motivo &eacute;
-pr&aacute;tico: no Live Expressions vira <strong>uma express&atilde;o por assunto</strong> em vez de trinta
-vari&aacute;veis soltas, e a expans&atilde;o mostra tudo junto.</p>
-
-<table>
-<thead>
-  <tr><td>Struct</td><td>Conte&uacute;do</td></tr>
-</thead>
-<tbody>
-  <tr><td class="id">link</td><td>Estado da cadeia e do smoke test</td></tr>
-  <tr><td class="id">meas</td><td>Tens&otilde;es de c&eacute;lula, extremos, validade e idade</td></tr>
-  <tr><td class="id">temp</td><td>Temperaturas, valores crus e diagn&oacute;stico</td></tr>
-  <tr class="destaque"><td class="id">fault</td><td>Falhas, m&aacute;scaras, <strong>limiares em vigor</strong> e hist&oacute;rico</td></tr>
-  <tr><td class="id">sim</td><td>Inje&ccedil;&atilde;o de falha</td></tr>
+  <tr><td class="id">link</td><td>Estado da cadeia e da comunicação</td></tr>
+  <tr><td class="id">meas</td><td>Tensões, mínima, máxima, validade e idade</td></tr>
+  <tr><td class="id">temp</td><td>Temperaturas, valores brutos e diagnóstico</td></tr>
+  <tr class="destaque"><td class="id">fault</td><td>Falha ativa, nó, célula e os limiares em uso, em mV e °C</td></tr>
+  <tr><td class="id">sim</td><td>Modo de injeção de falha</td></tr>
   <tr><td class="id">shutdown</td><td>Estado do circuito, causa e travamento</td></tr>
 </tbody>
 </table>
-
-<p>Os limiares moram dentro de <code>fault</code> de prop&oacute;sito: mostrar limiar, medi&ccedil;&atilde;o e
-veredito numa expans&atilde;o s&oacute; &eacute; o que torna a prova convincente numa inspe&ccedil;&atilde;o. Separados,
-seria preciso abrir tr&ecirc;s express&otilde;es e pedir ao avaliador que correlacione.</p>
-
-<p>Vari&aacute;veis de tipo <code>enum</code> &mdash; <code>fault.code</code>, <code>sim.active</code>,
-<code>shutdown.cause</code> &mdash; aparecem pelo <strong>nome</strong> no depurador, n&atilde;o pelo
-n&uacute;mero.</p>
+<p>Os limiares ficam dentro de <code>fault</code>, em graus e milivolts, ao lado da medição. Assim o
+avaliador vê limiar, medida e veredito numa tela só, e na injeção de falha vê o limiar se mover.</p>
 
 <div class="nota">
-  <div class="rot">Comandos dispon&iacute;veis pelo depurador</div>
-  <code>fault.clear_request = 1</code> limpa falhas latcheadas no dispositivo &mdash; necess&aacute;rio
-  porque a inicializa&ccedil;&atilde;o s&oacute; roda com a cadeia ca&iacute;da, e uma falha que trave depois dela
-  ficaria latcheada para sempre.<br>
-  <code>shutdown.reset_request = 1</code> destrava o shutdown.<br>
-  <code>sim.request = N</code> injeta falha; o bot&atilde;o azul cicla os modos sem depurador.<br>
-  <code>fault.ut_enabled = 1</code> liga a prote&ccedil;&atilde;o de subtemperatura, desligada por padr&atilde;o
-  enquanto n&atilde;o houver termistor.
+  <div class="rot">Comandos pelo depurador</div>
+  <code>fault.clear_request = 1</code> apaga falhas travadas no CI &nbsp;&bull;&nbsp;
+  <code>shutdown.reset_request = 1</code> destrava o shutdown &nbsp;&bull;&nbsp;
+  <code>sim.request = N</code> injeta a falha N &nbsp;&bull;&nbsp;
+  <code>fault.ut_enabled = 1</code> liga a subtemperatura
 </div>
 
-<div class="nota">
-  <div class="rot">Nota &mdash; falhas de partida</div>
-  As primeiras convers&otilde;es ap&oacute;s habilitar a temperatura acontecem antes das fontes de corrente
-  e dos filtros RC assentarem, e sinalizam erro que n&atilde;o corresponde a condi&ccedil;&atilde;o real. A
-  inicializa&ccedil;&atilde;o aguarda cinco ciclos de round robin (500 ms, realimentando o watchdog) e s&oacute;
-  ent&atilde;o limpa &mdash; separando ru&iacute;do de partida de falha de verdade.
+<!-- ===================================================== 12 -->
+<h2 id="s12">12. Problemas que encontrei</h2>
+
+<p>Nenhum destes é óbvio na documentação, e vários dão sintomas que apontam para o lugar errado.</p>
+
+<table>
+<thead><tr><td>Sintoma</td><td>Causa</td><td>O que resolveu</td></tr></thead>
+<tbody>
+  <tr><td>Nada respondia</td><td>UART a 115200</td><td>2 Mbit/s <span class="cit">[DS15, PRQ-723, p. 17]</span></td></tr>
+  <tr><td>Sem resposta com a velocidade certa</td><td>Transceiver ligado lado L com lado L</td><td>Ligação cruzada, HS &rarr; L P/L N</td></tr>
+  <tr><td>Só voltava replugando o cabo</td><td><code>VIO</code> do TLE9015 solto</td><td><code>VIO</code> no 3V3 <span class="cit">[DS15, Fig. 4, p. 11]</span></td></tr>
+  <tr><td>Lia por um tempo e parava</td><td>Watchdog do TLE9012 expirava</td><td>Recarga a cada ciclo <span class="cit">[UM, p. 49]</span></td></tr>
+  <tr><td>Reinicialização falhava para sempre</td><td>CI guardava o endereço antigo</td><td>Reset por <code>SLEEP_REG_RESET</code> <span class="cit">[UM, p. 59]</span></td></tr>
+  <tr><td>Tensão congelada com a CSC desligada</td><td>Erro não invalidava a leitura</td><td>Validade e idade em toda medição</td></tr>
+  <tr><td>Sobretemperatura a 24 °C</td><td><code>I_NTC</code> diferente de <code>INTC</code></td><td>Usar a mesma corrente nos dois</td></tr>
+  <tr><td>NTC de 10 kΩ lendo 3,5 kΩ</td><td>Resistores de 5,1 kΩ ligados por jumper na placa</td><td>Abrir os jumpers X40&ndash;X44 <span class="cit">[SCH, folha 3]</span></td></tr>
+  <tr><td>Falha de temperatura ao ligar</td><td>Medições antes de assentar; canais ativos sem NTC</td><td>Esperar 500 ms; ativar só os canais usados</td></tr>
+  <tr><td>Falha antiga presa na tela</td><td>Bit-resumo do diagnóstico não era apagado</td><td>Apagar também o bit-resumo</td></tr>
+  <tr><td>Multiread não respondia</td><td>Endereços errados, de memória</td><td><code>0x31</code> e <code>0x32</code> <span class="cit">[UM, Tab. 27, p. 62]</span></td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== 13 -->
+<h2 id="s13">13. Requisitos</h2>
+
+<h3>13.1 Como a lista funciona</h3>
+<p>Juntei numa lista só tudo o que o BMS precisa cumprir. Cada requisito tem quatro informações:</p>
+<ul>
+  <li><strong>Origem</strong> &mdash; de onde ele veio: <strong>Regra</strong> (imposto pelo regulamento),
+      <strong>Segurança</strong> (proteção que eu exijo além da regra), <strong>Desempenho</strong> (meta
+      do projeto) ou <strong>Interface</strong> (ligação com outro sistema ou com quem opera o BMS).</li>
+  <li><strong>Importância</strong>, de 1 a 5 &mdash; diz o que fazer primeiro e o que pode ser cortado se o
+      prazo apertar.</li>
+  <li><strong>Verificação</strong> &mdash; como vou provar que foi cumprido: <strong>Teste</strong> (medir e
+      comparar com um valor), <strong>Análise</strong> (cálculo ou conferência de projeto e datasheet) ou
+      <strong>Demonstração</strong> (mostrar a função acontecendo para o avaliador).</li>
+  <li><strong>Referência</strong> &mdash; o item do regulamento ou o objetivo que o originou.</li>
+</ul>
+
+<table>
+<thead><tr><td>Nota</td><td>Significa</td><td>Pode deixar de ser atendido?</td></tr></thead>
+<tbody>
+  <tr class="destaque"><td class="num">5</td><td>Eliminatório ou de segurança</td><td class="nao">Não</td></tr>
+  <tr><td class="num">4</td><td>Essencial para o BMS funcionar</td><td class="talvez">Só trocando por algo equivalente</td></tr>
+  <tr><td class="num">3</td><td>Importante para desempenho ou confiabilidade</td><td class="talvez">Sim, registrando a decisão</td></tr>
+  <tr><td class="num">2</td><td>Desejável, para operação e manutenção</td><td class="sim">Sim</td></tr>
+  <tr><td class="num">1</td><td>Informativo</td><td>Não se aplica</td></tr>
+</tbody>
+</table>
+
+<p><strong>Um projeto não precisa cumprir todos os requisitos, mas precisa saber quais deixou de fora.</strong>
+Os de <strong>regra</strong> não se negociam: qualquer um descumprido reprova a inspeção, e a única saída é
+uma consulta formal aos organizadores <span class="cit">[FSAE, GR.7, p. 9]</span>. Os de segurança,
+desempenho e interface fui eu que criei, então posso mudá-los, desde que a decisão fique registrada.
+Deixar de fazer algo de nota 2 ou 3 por decisão é reduzir escopo; descobrir na inspeção que algo não foi
+feito é falha. O bootloader, por exemplo, tem nota 2.</p>
+
+<h3>13.2 O que o regulamento mudou no projeto</h3>
+<ul>
+  <li><strong>Pack de 140S.</strong> O limite de 120 V por módulo <span class="cit">[FSAE, EV.5.1.1, p. 96]</span>
+      fixa 28 células em série por módulo (seção 2).</li>
+  <li><strong>Temperatura em 30% das células, com 4 CSCs por módulo.</strong> O regulamento pede no mínimo 20%
+      das células, distribuídas por todo o acumulador <span class="cit">[FSAE, EV.8.5.5, p. 108]</span>; a
+      equipe decidiu monitorar 30%. Um termistor pode valer por várias células se estiver em contato com o
+      terminal negativo de cada uma, ou no barramento a menos de 10 mm da solda
+      <span class="cit">[FSAE, EV.8.5.4 e EV.8.5.6, p. 108]</span>. No nosso 3P, cada termistor alcança duas
+      células. Então são 13 termistores por módulo, cobrindo 26 das 84 células (31,0%). Com 3 CSCs eu teria 15
+      canais e só 2 de folga; escolhi <strong>4 CSCs</strong>, que dão 20 canais e folga para termistores de
+      reserva. Como as 4 ficam na mesma placa slave, o calor do balanceamento também se espalha por 4 CIs
+      e por uma área maior.</li>
+  <li><strong>Fusível de sensoriamento de pelo menos 117,6 V.</strong> Cada fio de tensão precisa de proteção
+      junto à aba da célula, com tensão nominal igual ou maior que a do módulo
+      <span class="cit">[FSAE, EV.8.4.3, p. 107]</span>. O fusível de 63 V que eu tinha visto não serve.</li>
+  <li><strong>Sobretemperatura abaixo de 60 °C com exatidão</strong> (seção 9).</li>
+  <li><strong>Da versão de rascunho para a 1.0</strong>, nada do BMS mudou. Mudaram o tempo do lamp check, que
+      passou a 2 a 6 s <span class="cit">[FSAE, EV.6.3.2, p. 101]</span>, e a definição de módulo, que agora inclui
+      a estrutura que segura as células; o limite de 12 kg vale para o conjunto
+      <span class="cit">[FSAE, EV.1.2, p. 92]</span>.</li>
+</ul>
+
+<h3>13.3 Lista completa</h3>
+<p>104 requisitos: 67 de regra, 13 de segurança, 10 de desempenho e 14 de interface. Quando um requisito só repetia uma regra com outras palavras, juntei os dois.</p>
+<table>
+<thead><tr><td>ID</td><td>Requisito</td><td>Origem</td><td>Referência</td><td>Imp.</td><td>Verificação</td></tr></thead>
+<tbody>
+  <tr><td class="id">R-01</td><td>≤ 600 V entre quaisquer dois pontos</td><td>Regra</td><td>EV.3.3.2</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-02</td><td>Módulo ≤ 120 V estático</td><td>Regra</td><td>EV.5.1.1</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-03</td><td>Módulo ≤ 6 MJ</td><td>Regra</td><td>EV.5.1.1</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-04</td><td>Módulo ≤ 12 kg, incluindo a estrutura de suporte</td><td>Regra</td><td>EV.5.1.1</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-05</td><td>Componentes idênticos ao ESF</td><td>Regra</td><td>EV.5.1.3</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-06</td><td>Monitorar com TS ativo e em carga</td><td>Regra</td><td>EV.8.3.1</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-07</td><td>Tensão de cada célula</td><td>Regra</td><td>EV.8.4.1</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-08</td><td>Tensão nos limites do datasheet, com exatidão</td><td>Regra</td><td>EV.8.4.2</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-09</td><td>Medir temperatura das células</td><td>Regra</td><td>EV.8.5.1</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-10</td><td>&lt; min(datasheet, 60 °C), com exatidão</td><td>Regra</td><td>EV.8.5.2</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-11</td><td>Medir no terminal negativo</td><td>Regra</td><td>EV.8.5.3</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-12</td><td>Contato direto ou busbar &lt; 10 mm</td><td>Regra</td><td>EV.8.5.4</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-13</td><td>Mínimo 20% das células monitoradas (projeto adota 30%)</td><td>Regra</td><td>EV.8.5.5a</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-14</td><td>Sensores uniformemente distribuídos</td><td>Regra</td><td>EV.8.5.5b</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-14b</td><td>NTC no barramento negativo a menos de 10 mm dos pontos de solda das duas células que ele representa</td><td>Regra</td><td>EV.8.5.4, EV.8.5.6</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-15</td><td>Um sensor para várias células</td><td>Regra</td><td>EV.8.5.6</td><td class="num">1</td><td>Análise</td></tr>
+  <tr><td class="id">R-16</td><td>Isolação do sensor</td><td>Regra</td><td>EV.8.5.7</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-17</td><td>Detectar tensão fora da faixa</td><td>Regra</td><td>EV.8.3.4a</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-18</td><td>Detectar fusível de sensoriamento aberto</td><td>Regra</td><td>EV.8.3.4b</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-19</td><td>Detectar temperatura fora da faixa</td><td>Regra</td><td>EV.8.3.4c</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-20</td><td>Detectar medição ausente</td><td>Regra</td><td>EV.8.3.4d</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-21</td><td>Detectar falha no BMS</td><td>Regra</td><td>EV.8.3.4e</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-22</td><td>Abrir o SDC em falha</td><td>Regra</td><td>EV.8.3.5a</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-23</td><td>Parte do BMS normalmente aberta</td><td>Regra</td><td>EV.8.1.4</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-24</td><td>Independente de IMD e BSPD</td><td>Regra</td><td>EV.8.1.5</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-25</td><td>Lado alto da bobina dos IR</td><td>Regra</td><td>EV.8.1.3</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-26</td><td>Desabilitado até reset manual</td><td>Regra</td><td>EV.8.2.3a</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-27</td><td>Reset manual no veículo</td><td>Regra</td><td>EV.8.2.3b</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-28</td><td>Piloto não reativa de dentro</td><td>Regra</td><td>EV.8.2.3c</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-29</td><td>Demonstrar funções na inspeção</td><td>Regra</td><td>EV.8.1.7</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-30</td><td>Luz BMS e TSSI até o reset</td><td>Regra</td><td>EV.8.3.5b</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-31</td><td>Luz BMS vermelha, visível, marcada</td><td>Regra</td><td>EV.8.3.6</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-32</td><td>Lamp check ≤ 1 s, 2 a 6 s aceso</td><td>Regra</td><td>EV.6.3.2</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-33</td><td>Lamp check não impede a função de nenhum indicador</td><td>Regra</td><td>EV.6.3.3</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-34</td><td>TSSI piscando 2,5–5 Hz</td><td>Regra</td><td>EV.6.1.7c</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-35</td><td>Sem balanceamento com SDC aberto</td><td>Regra</td><td>EV.8.3.3</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-36</td><td>BMS no Charging SDC</td><td>Regra</td><td>EV.9.3.1</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-37</td><td>Contato NA e independente</td><td>Regra</td><td>EV.9.3.2</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-38</td><td>Abrir o Charging SDC em falha</td><td>Regra</td><td>EV.9.4.1</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-39</td><td>Carregador bloqueado até reset</td><td>Regra</td><td>EV.9.4.2</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-40</td><td>Demonstrar carga na inspeção</td><td>Regra</td><td>EV.9.1.1</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-41</td><td>Isolação entre módulos</td><td>Regra</td><td>EV.8.3.2</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-42</td><td>Rating para a tensão máxima do TS</td><td>Regra</td><td>EV.5.2.1</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-43</td><td>Separação galvânica TS/GLV</td><td>Regra</td><td>EV.7.5.1</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-44</td><td>BMS pode ficar no container</td><td>Regra</td><td>EV.7.5.4</td><td class="num">1</td><td>Análise</td></tr>
+  <tr><td class="id">R-45</td><td>Barreira ou afastamento no invólucro</td><td>Regra</td><td>EV.7.5.5</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-46</td><td>Afastamento TS/GLV na placa</td><td>Regra</td><td>EV.7.5.7</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-47</td><td>Evidência de afastamento</td><td>Regra</td><td>EV.7.5.8</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-48</td><td>Isolação na conexão a laptop</td><td>Regra</td><td>EV.7.5.9</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-49</td><td>Fios no container ≥ tensão máxima (588 V)</td><td>Regra</td><td>EV.5.2.5</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-50</td><td>Isolação ≥ 90 °C, fios marcados</td><td>Regra</td><td>EV.7.2 / 7.3.2</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-51</td><td>Não-TS não pode ser laranja</td><td>Regra</td><td>EV.7.3.5</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-52</td><td>Isolação ≥ 500 Ω/V a 500 V</td><td>Regra</td><td>IN.10.2</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-53</td><td>Proteção em todo fio de sensoriamento</td><td>Regra</td><td>EV.8.4.3</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-54</td><td>Proteção junto à aba da célula</td><td>Regra</td><td>EV.8.4.3a</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-55</td><td>Rating ≥ tensão máxima do módulo (117,6 V)</td><td>Regra</td><td>EV.8.4.3b</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-56</td><td>Interrupção &gt; corrente de curto</td><td>Regra</td><td>EV.7.6.2c</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-57</td><td>ESF do sistema elétrico</td><td>Regra</td><td>EV.2.1</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-58</td><td>ESF e datasheets na inspeção</td><td>Regra</td><td>IN.5.1</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-59</td><td>Itens visíveis sem instrumentos</td><td>Regra</td><td>IN.2.3</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-60</td><td>Falha coloca o carro em Red Car</td><td>Regra</td><td>EV.13.1b</td><td class="num">1</td><td>Análise</td></tr>
+  <tr><td class="id">R-61</td><td>4 CSCs por módulo, 7 grupos cada (48 canais de tensão para 28 grupos, 20 de NTC para 13)</td><td>Regra</td><td>EV.8.5.5a</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-62</td><td>Transformador entre módulos</td><td>Regra</td><td>EV.8.3.2</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-63</td><td>Exatidão de temperatura documentada</td><td>Regra</td><td>EV.8.5.2</td><td class="num">4</td><td>Análise</td></tr>
+  <tr><td class="id">R-64</td><td>Detectar NTC aberto ou em curto</td><td>Regra</td><td>EV.8.3.4d</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-65</td><td>Detectar perda de comunicação</td><td>Regra</td><td>EV.8.3.4d</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-66</td><td>Injeção real de falha</td><td>Regra</td><td>EV.8.1.7</td><td class="num">4</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-67</td><td>Validade e idade de toda medição</td><td>Segurança</td><td>Bancada</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-68</td><td>Arredondamento na direção do disparo</td><td>Segurança</td><td>—</td><td class="num">3</td><td>Análise</td></tr>
+  <tr><td class="id">R-69</td><td>Histerese de retorno</td><td>Segurança</td><td>—</td><td class="num">3</td><td>Teste</td></tr>
+  <tr><td class="id">R-70</td><td>Reação à falha ≤ 500 ms</td><td>Segurança</td><td>—</td><td class="num">4</td><td>Teste</td></tr>
+  <tr><td class="id">R-71</td><td>Histórico de falhas</td><td>Segurança</td><td>—</td><td class="num">3</td><td>Teste</td></tr>
+  <tr><td class="id">R-72</td><td>Subtemperatura em firmware</td><td>Segurança</td><td>—</td><td class="num">2</td><td>Teste</td></tr>
+  <tr><td class="id">R-73</td><td>Acionamento do SDC por onda quadrada</td><td>Segurança</td><td>—</td><td class="num">4</td><td>Teste</td></tr>
+  <tr><td class="id">R-74</td><td>Reset ignorado com falha ativa</td><td>Segurança</td><td>—</td><td class="num">4</td><td>Teste</td></tr>
+  <tr><td class="id">R-75</td><td>Registro da causa da abertura</td><td>Segurança</td><td>—</td><td class="num">3</td><td>Teste</td></tr>
+  <tr><td class="id">R-76</td><td>Diagnóstico de corrente de balanceamento</td><td>Segurança</td><td>—</td><td class="num">3</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-77</td><td>Dissipação compatível com o container</td><td>Segurança</td><td>—</td><td class="num">4</td><td>Análise</td></tr>
+  <tr><td class="id">R-78</td><td>Watchdog do TLE9012 realimentado</td><td>Segurança</td><td>Bancada</td><td class="num">4</td><td>Teste</td></tr>
+  <tr><td class="id">R-79</td><td>Topologia em anel — em aberto</td><td>Segurança</td><td>—</td><td class="num">3</td><td>Teste</td></tr>
+  <tr><td class="id">R-80</td><td>Acumulador 140S3P em 5 módulos de 28S3P (420 células, 588 V)</td><td>Desempenho</td><td>—</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-80b</td><td>Cobertura de temperatura de 30% das células: 13 dos 20 NTCs por módulo, 65 no pack, 2 células por termistor</td><td>Desempenho</td><td>—</td><td class="num">4</td><td>Análise</td></tr>
+  <tr><td class="id">R-81</td><td>Ciclo de leitura ≤ 100 ms</td><td>Desempenho</td><td>Objetivo 1</td><td class="num">4</td><td>Teste</td></tr>
+  <tr><td class="id">R-82</td><td>Multiread por CSC</td><td>Desempenho</td><td>—</td><td class="num">3</td><td>Teste</td></tr>
+  <tr><td class="id">R-83</td><td>Exatidão de tensão ≤ ±10 mV</td><td>Desempenho</td><td>Objetivo 4</td><td class="num">4</td><td>Teste</td></tr>
+  <tr><td class="id">R-84</td><td>Temperatura a cada ≤ 1 s</td><td>Desempenho</td><td>—</td><td class="num">3</td><td>Teste</td></tr>
+  <tr><td class="id">R-85</td><td>Balanceamento externo por PMOS</td><td>Desempenho</td><td>—</td><td class="num">3</td><td>Análise</td></tr>
+  <tr><td class="id">R-86</td><td>Balanceamento ≥ 500 mA</td><td>Desempenho</td><td>Objetivo 3</td><td class="num">3</td><td>Teste</td></tr>
+  <tr><td class="id">R-87</td><td>Balanceamento pausado na medição</td><td>Desempenho</td><td>—</td><td class="num">4</td><td>Teste</td></tr>
+  <tr><td class="id">R-88</td><td>Suporte à cadeia completa de CSCs (20 nós)</td><td>Desempenho</td><td>Objetivo 1</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-89</td><td>Master STM32G491 + TLE9015</td><td>Interface</td><td>—</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-90</td><td>Daisy chain iso UART a 2 Mbit/s</td><td>Interface</td><td>—</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-91</td><td>Acoplamento capacitivo dentro do módulo</td><td>Interface</td><td>—</td><td class="num">4</td><td>Análise</td></tr>
+  <tr><td class="id">R-92</td><td>Dados publicados na CAN</td><td>Interface</td><td>VCU</td><td class="num">4</td><td>Teste</td></tr>
+  <tr><td class="id">R-93</td><td>Mensagens para o datalogger</td><td>Interface</td><td>Telemetria</td><td class="num">2</td><td>Teste</td></tr>
+  <tr><td class="id">R-94</td><td>Transceiver CAN na master</td><td>Interface</td><td>—</td><td class="num">4</td><td>Análise</td></tr>
+  <tr><td class="id">R-95</td><td>20 canais de tensão ociosos por módulo no negativo da célula mais baixa usada; TMP ociosos por pull-down &gt; 10 kΩ</td><td>Interface</td><td>Datasheet</td><td class="num">4</td><td>Análise</td></tr>
+  <tr><td class="id">R-96</td><td>VS de cada CSC dentro da faixa</td><td>Interface</td><td>Datasheet</td><td class="num">4</td><td>Análise</td></tr>
+  <tr><td class="id">R-97</td><td>VS e VIO do TLE9015 alimentados</td><td>Interface</td><td>Bancada</td><td class="num">4</td><td>Teste</td></tr>
+  <tr><td class="id">R-98</td><td>Entradas e saídas de segurança</td><td>Interface</td><td>—</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-99</td><td>Driver sem dependência de HAL</td><td>Interface</td><td>—</td><td class="num">2</td><td>Análise</td></tr>
+  <tr><td class="id">R-100</td><td>Parâmetros alteráveis sem recompilar</td><td>Interface</td><td>—</td><td class="num">2</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-101</td><td>Bootloader CAN</td><td>Interface</td><td>—</td><td class="num">2</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-102</td><td>Estado legível numa única tela</td><td>Interface</td><td>—</td><td class="num">2</td><td>Demonstração</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== HW -->
+<h2 id="sHW">14. Placa slave: ligação do TLE9012</h2>
+
+<p>Cada slave tem 4 TLE9012, e cada um mede 7 grupos 3P. Chamo de <strong>T0 a T7</strong> os oito pontos de
+tomada de um TLE9012: T0 é o negativo do grupo de baixo, T7 é o positivo do grupo de cima. O T0 de uma CSC
+é o T7 da CSC de baixo.</p>
+
+<p>Tirei a ligação de três fontes, que concordam entre si: o esquemático de aplicação do manual
+<span class="cit">[UM, Fig. 18 e Tab. 1&ndash;4, p. 19&ndash;24]</span>, o esquemático da placa de avaliação que usei na
+bancada <span class="cit">[SCH, folhas 2 e 3]</span> e o circuito de balanceamento externo do datasheet
+<span class="cit">[DS12, Fig. 12, p. 44]</span>. Os valores são os da placa de avaliação.</p>
+
+<div class="decisao">
+  <div class="rot">Decisão</div>
+  <div class="peca">Células nos canais 5 a 11; canais 0 a 4 no T0</div>
+  <p>Com menos de 12 células, o manual põe as células nos canais de cima e liga os canais que sobram ao
+  negativo da célula mais baixa <span class="cit">[UM, seç. 2.1.7, Fig. 22, p. 27]</span>. No firmware, o
+  <code>PART_CONFIG</code> vira <code>0x0FE0</code>.</p>
 </div>
 
-<h2 id="s9">11. Refer&ecirc;ncias</h2>
-<ol class="refs">
-  <li>Infineon, <em>TLE9012DQU, TLE9015DQU &mdash; User Manual</em>, Rev. 1.0, Z8F80064984, 2022-01-24.</li>
-  <li>STMicroelectronics, <em>STM32G4 Series &mdash; Reference Manual</em>, RM0440 (cobre a linha G491).</li>
-  <li>STMicroelectronics, <em>STM32G491xC/xE &mdash; Datasheet</em>.</li>
-  <li>STMicroelectronics, <em>NUCLEO-G491RE &mdash; User Manual</em> (pinagem, solder bridges do VCP).</li>
-  <li>SAE J1850, <em>Class B Data Communications Network Interface</em> &mdash; CRC polynomial.</li>
-  <li>STMicroelectronics, <em>AN2606 &mdash; STM32 system memory boot mode</em>.</li>
-  <li>MaxMax-embedded, <em>TLE9012_Arduino_Lib</em>, licen&ccedil;a MIT.
-      <br><code>https://github.com/MaxMax-embedded/TLE9012_Arduino_Lib</code></li>
-</ol>
+<h3>Pino a pino</h3>
+<table>
+<thead><tr><td>Pino</td><td>Nome</td><td>Liga em</td><td>Componentes</td></tr></thead>
+<tbody>
+  <tr><td class="num">1</td><td class="id">G5</td><td>Gate do PMOS do grupo T0&ndash;T1</td><td>100 nF até o U5 (C_FB)</td></tr>
+  <tr><td class="num">2</td><td class="id">U5</td><td>T0</td><td>10 Ω em série (R_F); 330 nF até o U6 (C_F)</td></tr>
+  <tr><td class="num">3&ndash;12</td><td class="id">G4&hellip;U0</td><td>GND local (T0)</td><td>Ligação direta; são os canais sem célula</td></tr>
+  <tr><td class="num">13</td><td class="id">TMP4</td><td>NTC, ou pull-down se sem uso</td><td>Ver "Termistores" abaixo</td></tr>
+  <tr><td class="num">14</td><td class="id">TMP3</td><td>NTC, ou pull-down se sem uso</td><td>Idem</td></tr>
+  <tr><td class="num">15</td><td class="id">GND</td><td>T0</td><td>&mdash;</td></tr>
+  <tr><td class="num">16</td><td class="id">TMP2</td><td>NTC</td><td>Idem</td></tr>
+  <tr><td class="num">17</td><td class="id">TMP1</td><td>NTC</td><td>Idem</td></tr>
+  <tr><td class="num">18</td><td class="id">TMP0</td><td>NTC</td><td>Idem</td></tr>
+  <tr><td class="num">19</td><td class="id">TMP_GND</td><td>Retorno dos NTCs, ao GND local</td><td>Pode ir direto ao GND <span class="cit">[DS12, p. 7]</span>; a placa de avaliação usa 0 Ω</td></tr>
+  <tr><td class="num">20</td><td class="id">PWM1</td><td>GND</td><td>Pull-down de 33 kΩ <span class="cit">[DS12, p. 7]</span></td></tr>
+  <tr><td class="num">21</td><td class="id">PWM0</td><td>GND</td><td>Pull-down de 33 kΩ</td></tr>
+  <tr><td class="num">22</td><td class="id">GND</td><td>T0</td><td>&mdash;</td></tr>
+  <tr><td class="num">23</td><td class="id">IFL_L</td><td>Nó de baixo</td><td>39 Ω perto do CI, 1 nF C0G em série, 220 pF ao GND</td></tr>
+  <tr><td class="num">24</td><td class="id">IFL_H</td><td>Nó de baixo</td><td>Idem</td></tr>
+  <tr><td class="num">25</td><td class="id">IFH_H</td><td>Nó de cima</td><td>Idem</td></tr>
+  <tr><td class="num">26</td><td class="id">IFH_L</td><td>Nó de cima</td><td>Idem</td></tr>
+  <tr><td class="num">27</td><td class="id">VDDC</td><td>&mdash;</td><td>330 nF ao GND, colado no pino</td></tr>
+  <tr><td class="num">28</td><td class="id">GPIO0/UART_LS</td><td>GND</td><td>Direto <span class="cit">[DS12, p. 8]</span></td></tr>
+  <tr><td class="num">29</td><td class="id">GPIO1/UART_HS</td><td>GND</td><td>Direto</td></tr>
+  <tr><td class="num">30</td><td class="id">VIO</td><td>VREGOUT</td><td>Ligação direta, como na placa de avaliação (R56 de 0 Ω)</td></tr>
+  <tr><td class="num">31</td><td class="id">VREGOUT</td><td>&mdash;</td><td>100 nF ao GND, colado no pino</td></tr>
+  <tr><td class="num">32</td><td class="id">NC</td><td>GND</td><td>Direto <span class="cit">[DS12, p. 8]</span> (a placa de avaliação usa 100 kΩ)</td></tr>
+  <tr><td class="num">33</td><td class="id">ERR</td><td>Aberto</td><td>Sem uso <span class="cit">[DS12, p. 8]</span></td></tr>
+  <tr><td class="num">34</td><td class="id">VS</td><td>T7</td><td>5,1 Ω em série; 100 nF + 1 nF ao GND; rotear longe do U12 <span class="cit">[UM, p. 25]</span></td></tr>
+  <tr><td class="num">35</td><td class="id">U12P</td><td>T7</td><td>10 Ω, 100 nF ao GND, depois 5,1 Ω até o pino</td></tr>
+  <tr><td class="num">36</td><td class="id">U12</td><td>T7</td><td>10 Ω em série; 330 nF até o U11, colado nos pinos <span class="cit">[UM, p. 24]</span></td></tr>
+  <tr><td class="num">37</td><td class="id">G11</td><td>Gate do PMOS do grupo T6&ndash;T7</td><td>100 nF até o U11</td></tr>
+  <tr><td class="num">38</td><td class="id">U11</td><td>T6</td><td>10 Ω em série; 330 nF até o U10</td></tr>
+  <tr><td class="num">39</td><td class="id">G10</td><td>Gate do PMOS do grupo T5&ndash;T6</td><td>100 nF até o U10</td></tr>
+  <tr><td class="num">40</td><td class="id">U10</td><td>T5</td><td>10 Ω em série; 330 nF até o U9</td></tr>
+  <tr><td class="num">41</td><td class="id">G9</td><td>Gate do PMOS do grupo T4&ndash;T5</td><td>100 nF até o U9</td></tr>
+  <tr><td class="num">42</td><td class="id">U9</td><td>T4</td><td>10 Ω em série; 330 nF até o U8</td></tr>
+  <tr><td class="num">43</td><td class="id">G8</td><td>Gate do PMOS do grupo T3&ndash;T4</td><td>100 nF até o U8</td></tr>
+  <tr><td class="num">44</td><td class="id">U8</td><td>T3</td><td>10 Ω em série; 330 nF até o U7</td></tr>
+  <tr><td class="num">45</td><td class="id">G7</td><td>Gate do PMOS do grupo T2&ndash;T3</td><td>100 nF até o U7</td></tr>
+  <tr><td class="num">46</td><td class="id">U7</td><td>T2</td><td>10 Ω em série; 330 nF até o U6</td></tr>
+  <tr><td class="num">47</td><td class="id">G6</td><td>Gate do PMOS do grupo T1&ndash;T2</td><td>100 nF até o U6</td></tr>
+  <tr><td class="num">48</td><td class="id">U6</td><td>T1</td><td>10 Ω em série; 330 nF até o U5</td></tr>
+  <tr><td class="num">49</td><td class="id">Pad</td><td>GND</td><td>Vias térmicas; a placa de teste da Infineon usa 16 de 0,3 mm <span class="cit">[DS12, p. 13]</span></td></tr>
+</tbody>
+</table>
 
-<h3>9.1 Uso da Biblioteca de Refer&ecirc;ncia</h3>
-
-<p>A biblioteca <em>TLE9012_Arduino_Lib</em> &eacute; uma implementa&ccedil;&atilde;o aberta e funcional do driver, validada em
-ESP32 e Arduino Uno R4. Ela n&atilde;o &eacute; port&aacute;vel diretamente (depende de <code>HardwareSerial</code>), mas serve
-como refer&ecirc;ncia de alto valor em tr&ecirc;s pontos:</p>
-
-<ol>
-  <li><strong>Mapa de registradores</strong> &mdash; <code>TLE9012_Makros.h</code> j&aacute; cont&eacute;m endere&ccedil;os e m&aacute;scaras de
-      bitfield transcritos do datasheet, eliminando a etapa mais tediosa e mais sujeita a erro do
-      desenvolvimento.</li>
-  <li><strong>Modelo de API</strong> &mdash; a separa&ccedil;&atilde;o entre acesso de baixo n&iacute;vel
-      (<code>readRegisterSingle</code>, <code>writeRegisterBroadcast</code>) e fun&ccedil;&otilde;es de alto n&iacute;vel
-      (<code>readCellVoltages</code>, <code>startBalancing</code>) &eacute; um bom ponto de partida para a interface
-      do nosso <code>tle9012.c</code>.</li>
-  <li><strong>Tratamento de erros por callback</strong> &mdash; <code>attachErrorHandler()</code> com ponteiros de
-      fun&ccedil;&atilde;o por tipo de falha, aderente &agrave; abordagem de transporte injet&aacute;vel da se&ccedil;&atilde;o 6.7.</li>
-</ol>
-
-<div class="nota">
-  <div class="rot">Nota &mdash; licen&ccedil;a</div>
-  A licen&ccedil;a MIT permite reutiliza&ccedil;&atilde;o e modifica&ccedil;&atilde;o, inclusive em projeto fechado, desde que o aviso de
-  copyright e o texto da licen&ccedil;a sejam preservados. Se trechos forem portados, manter a atribui&ccedil;&atilde;o
-  no cabe&ccedil;alho do arquivo correspondente.
-</div>
-
+<h3>Balanceamento externo, um por grupo</h3>
+<p>O datasheet recomenda um PMOS de nível lógico em cada Gn <span class="cit">[DS12, seç. 13, p. 43]</span>. Quando o
+TLE9012 balanceia, ele puxa o Gn para o Un, e o PMOS liga com o gate uma tensão de célula abaixo do source.</p>
+<table>
+<thead><tr><td>Ligação</td><td>Onde</td></tr></thead>
+<tbody>
+  <tr><td>Source do PMOS</td><td>Positivo do grupo (tomada de cima)</td></tr>
+  <tr><td>Drain do PMOS</td><td>R_BAL até o negativo do grupo</td></tr>
+  <tr><td>Gate do PMOS</td><td>Pino Gn</td></tr>
+  <tr><td>R_B</td><td>Entre gate e source, para manter o PMOS desligado</td></tr>
+  <tr><td>R_OC/UC (opcional)</td><td>Em série com o R_BAL, para o diagnóstico de corrente de balanceamento <span class="cit">[DS12, p. 44]</span></td></tr>
+</tbody>
+</table>
 <div class="aviso">
-  <div class="rot">Limita&ccedil;&otilde;es conhecidas da refer&ecirc;ncia</div>
-  A pr&oacute;pria biblioteca documenta que o comando <em>multiread</em> n&atilde;o est&aacute; implementado nas vers&otilde;es atuais.
-  Como o multiread &eacute; o mecanismo mais eficiente para ler as 12 tens&otilde;es num &uacute;nico ciclo, essa
-  funcionalidade foi escrita do zero &mdash; ver se&ccedil;&atilde;o 10.3.</p>
-  <p><strong>Corre&ccedil;&atilde;o:</strong> as revis&otilde;es 1.0&ndash;1.3 citavam <code>MULTI_READ</code> em 0x24 e
-  <code>MULTI_READ_CFG</code> em 0x25. <strong>Ambos estavam errados</strong> &mdash; 0x24 &eacute; o
-  <code>PCVM_11</code>. Os enderecos corretos, conforme a Tabela 27 do manual, s&atilde;o
-  <strong>0x31</strong> e <strong>0x32</strong>.
+  <div class="rot">Valores em aberto</div>
+  O datasheet não dá valores para R_B e R_BAL. Pela minha conta, 500 mA a 4,2 V pedem R_BAL de cerca de 8,2 Ω,
+  o que dissipa uns 2 W por grupo, e o PMOS precisa conduzir bem com VGS de só &minus;2,5 V (célula vazia).
+  Com 28 grupos por slave, a corrente e o ciclo de trabalho têm de sair junto com a análise térmica.
 </div>
+
+<h3>Termistores</h3>
+<ul>
+  <li><strong>Usar os canais a partir do TMP0, em sequência.</strong> A configuração ativa os canais em ordem a
+      partir do TMP0 <span class="cit">[UM, seç. 3.2.4, p. 54]</span>. Com 13 NTCs por slave, uma CSC usa TMP0 a TMP3
+      e as outras três usam TMP0 a TMP2. Cada CSC lê os NTCs dos seus próprios grupos.</li>
+  <li><strong>Canal em uso:</strong> NTC entre o pino e o TMP_GND, com 100 Ω em série, 10 nF no pino e 4,7 nF no
+      conector <span class="cit">[UM, Tab. 3, p. 23; SCH, folha 3]</span>.</li>
+  <li><strong>Canal sem uso:</strong> pull-down de mais de 10 kΩ ao GND <span class="cit">[DS12, p. 7]</span>.</li>
+  <li>O NTC encosta no barramento de outra célula, então precisa de isolação entre sensor e célula
+      <span class="cit">[FSAE, EV.8.5.7, p. 108]</span>.</li>
+</ul>
+
+<h3>Comunicação dentro da slave</h3>
+<p>Entrada da slave &rarr; IFL da CSC 1 &rarr; IFH da CSC 1 &rarr; IFL da CSC 2 &rarr; &hellip; &rarr; IFH da CSC 4 &rarr;
+saída da slave. Cada lado de cada CI tem a sua rede de 39 Ω e 1 nF. Entre CSCs da mesma placa a diferença
+de tensão é de uns 29,4 V, e o manual diz que 100 V bastam para o capacitor em série quando o sistema não
+pede mais <span class="cit">[UM, Tab. 2, p. 22]</span>. A terminação de 100 Ω com 250 pF só vai no último nó da
+cadeia, a CSC 20, e é opcional <span class="cit">[UM, Tab. 4, p. 24]</span>.</p>
+
+<h3>Fusíveis de sensoriamento</h3>
+<p>A placa de avaliação tem um fusível de 0,5 A (0437.500WRA) em cada fio de célula, logo no conector
+<span class="cit">[SCH, folha 2]</span>. O regulamento pede que a proteção fique no condutor ligado direto à aba
+da célula, com tensão nominal de pelo menos 117,6 V <span class="cit">[FSAE, EV.8.4.3, p. 107]</span>. Ainda não
+conferi a tensão nominal desse fusível.</p>
+
+<!-- ===================================================== 14 -->
+<h2 id="s14">15. Próximos passos</h2>
+
+<h3>Firmware</h3>
+<ol>
+  <li><strong>Cadeia completa, 20 CSCs.</strong> O driver já recebe o endereço do nó em todas as funções; falta
+      transformar as leituras em tabelas por nó. Cada CSC terá 7 grupos nos canais 5 a 11, então o
+      <code>PART_CONFIG</code> passa de <code>0x0FFF</code> para <code>0x0FE0</code> e o firmware ignora os canais
+      0 a 4, que leriam 0 V e disparariam subtensão (seção 14).</li>
+  <li><strong>Balanceamento</strong>, desligado durante a medição e proibido com o shutdown aberto
+      <span class="cit">[FSAE, EV.8.3.3, p. 107]</span>.</li>
+  <li><strong>Luz BMS com lamp check</strong> <span class="cit">[FSAE, EV.8.3.6, p. 107; EV.6.3.2, p. 101]</span>,
+      <strong>sinal para o TSSI</strong> piscar de 2,5 a 5 Hz <span class="cit">[FSAE, EV.6.1.7, p. 100]</span>,
+      <strong>entrada de reset físico</strong> e <strong>leitura do estado do shutdown</strong>.</li>
+  <li><strong>Charging shutdown circuit</strong> <span class="cit">[FSAE, EV.9.4, p. 111]</span>.</li>
+  <li><strong>Fio aberto ativo com células reais</strong>, para detectar fusível de sensoriamento queimado
+      <span class="cit">[FSAE, EV.8.3.4b, p. 107]</span>.</li>
+  <li><strong>Parâmetros em flash, CAN e bootloader</strong> (fases 3 e 4).</li>
+</ol>
+
+<h3>Hardware</h3>
+<ol>
+  <li><strong>Placa slave própria</strong>, uma por módulo, com 4 TLE9012 ligados por trilha (acoplamento
+      capacitivo) e balanceamento externo por PMOS (corrente maior que os 200 mA do
+      CI), fusíveis de sensoriamento de pelo menos 117,6 V e afastamentos de isolação do regulamento
+      <span class="cit">[FSAE, EV.7.5.7, p. 104]</span>.</li>
+  <li><strong>Ligação de cada pino do TLE9012</strong>: definida na seção 14.</li>
+  <li><strong>Valores do balanceamento externo</strong>: PMOS, R_B e R_BAL, junto com a análise térmica.</li>
+  <li><strong>Posição dos termistores</strong> no barramento negativo, a menos de 10 mm das soldas das duas células.</li>
+</ol>
+
+<h3>Plano das fases 3 e 4</h3>
+<p>A ideia é que mudar número de células, limiares ou IDs da CAN não exija recompilar: tudo fica numa
+tabela de parâmetros na flash, protegida por CRC, alterável pela CAN. O bootloader fica no começo da flash
+e decide no reset se atualiza ou pula para a aplicação.</p>
+<table>
+<thead><tr><td>Região</td><td>Endereço</td><td>Tamanho</td><td>Conteúdo</td></tr></thead>
+<tbody>
+  <tr><td class="id">BOOTLOADER</td><td class="id">0x0800 0000</td><td class="num">16 KB</td><td>Bootloader CAN, protegido contra escrita</td></tr>
+  <tr><td class="id">APP</td><td class="id">0x0800 4000</td><td class="num">480 KB</td><td>Firmware do BMS</td></tr>
+  <tr><td class="id">PARAMS</td><td class="id">0x0807 C000</td><td class="num">8 KB</td><td>Tabela de parâmetros</td></tr>
+  <tr><td class="id">PARAMS_BKP</td><td class="id">0x0807 E000</td><td class="num">8 KB</td><td>Cópia de segurança da tabela</td></tr>
+</tbody>
+</table>
+
+<h3>Decisões em aberto</h3>
+<table>
+<thead><tr><td>Decisão</td><td>O que depende dela</td></tr></thead>
+<tbody>
+  <tr><td>Célula do acumulador (a placa de pré-carga usa a Molicel P28A; falta confirmar para o BMS)</td><td>Limiares de tensão e temperatura, massa do módulo, dissipação do balanceamento</td></tr>
+  <tr><td>Limiar final de sobretemperatura</td><td>Exatidão do conjunto NTC + CI</td></tr>
+  <tr><td>Topologia em anel</td><td>Tolerância a um fio partido na cadeia</td></tr>
+  <tr><td>Placa master própria</td><td>Entradas e saídas de segurança, alimentação do TLE9015</td></tr>
+  <tr><td>Tempo máximo de reação a falhas</td><td>O regulamento não fixa valor</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== 15 -->
+<h2 id="s15">16. Registro de decisões</h2>
+
+<table>
+<thead><tr><td>#</td><td>Decisão</td><td>Por quê</td><td>Quando</td></tr></thead>
+<tbody>
+  <tr><td class="id">D1</td><td>TLE9012DQU + TLE9015DQU</td><td>12 células e 5 NTCs por CI, cadeia isolada, kits disponíveis</td><td>ago/2026</td></tr>
+  <tr><td class="id">D2</td><td>STM32G491 (NUCLEO-G491RE); AURIX TC375 adiado</td><td>Placa disponível; flash do AURIX encarece o bootloader</td><td>ago/2026</td></tr>
+  <tr><td class="id">D3</td><td>Bare-metal, sem RTOS</td><td>Laço periódico simples; menos a depurar</td><td>ago/2026</td></tr>
+  <tr><td class="id">D4</td><td>Depuração pelo Live Expressions, sem <code>printf</code></td><td>Vê o estado ao vivo sem parar o programa</td><td>ago/2026</td></tr>
+  <tr><td class="id">D5</td><td>Bootloader CAN só na fase 4</td><td>É conveniência; o ST-Link basta até lá</td><td>ago/2026</td></tr>
+  <tr><td class="id">D6</td><td>Driver do TLE9012 sem HAL</td><td>Troca de MCU e teste no PC sem reescrever o driver</td><td>ago/2026</td></tr>
+  <tr><td class="id">D7</td><td>iso UART a 2 Mbit/s, um fio, DMA na TX e DMA circular na RX</td><td>Bytes colados e resposta logo após o eco</td><td>ago/2026</td></tr>
+  <tr><td class="id">D8</td><td><code>VIO</code> do TLE9015 no 3V3, <code>VS</code> no 5 V</td><td><code>VIO</code> solto desativa a UART <span class="cit">[DS15, p. 11]</span></td><td>ago/2026</td></tr>
+  <tr><td class="id">D9</td><td>Watchdog do TLE9012 recarregado a cada ciclo</td><td>Watchdog vencido apaga o endereço <span class="cit">[UM, p. 49]</span></td><td>ago/2026</td></tr>
+  <tr><td class="id">D10</td><td>Multiread para as 12 tensões</td><td>Uma transação em vez de doze</td><td>ago/2026</td></tr>
+  <tr><td class="id">D11</td><td>Fim de conversão por leitura do <code>PCVM_START</code></td><td>Sem espera arbitrária; conversão travada vira erro</td><td>ago/2026</td></tr>
+  <tr><td class="id">D12</td><td>Validade e idade em toda medição</td><td>Nunca decidir sobre dado velho</td><td>ago/2026</td></tr>
+  <tr><td class="id">D13</td><td>Histerese de 200 mV na tensão e de 5 °C na temperatura</td><td>Evitar falha entrando e saindo</td><td>ago/2026</td></tr>
+  <tr><td class="id">D14</td><td>Sobretemperatura no TLE9012; subtemperatura no firmware, desligada sem termistor</td><td>O CI só tem limiar quente</td><td>ago/2026</td></tr>
+  <tr><td class="id">D15</td><td>Injeção de falha real, pelo botão azul</td><td>Provar a detecção na inspeção</td><td>ago/2026</td></tr>
+  <tr><td class="id">D16</td><td>LD2 piscando = vivo</td><td>Firmware travado não parece normal</td><td>ago/2026</td></tr>
+  <tr><td class="id">D17</td><td>Shutdown: alto fecha, pull-down, travamento, reset ignorado com falha; opção de onda quadrada</td><td>MCU morto abre o circuito; carro não religa sozinho</td><td>ago/2026</td></tr>
+  <tr><td class="id">D18</td><td>Todas as falhas geram o sinal de erro (EMM)</td><td>Caminho de proteção independente do firmware</td><td>ago/2026</td></tr>
+  <tr><td class="id">D19</td><td>Estado em seis structs, limiares em mV e °C</td><td>Legível numa tela no depurador</td><td>ago/2026</td></tr>
+  <tr><td class="id">D20</td><td>Ligação entre módulos por transformador; dentro do módulo, capacitiva por trilha</td><td>Isolação entre módulos</td><td>set/2026</td></tr>
+  <tr><td class="id">D21</td><td>Placa slave própria com balanceamento externo por PMOS</td><td>Corrente maior que os 200 mA do CI</td><td>set/2026</td></tr>
+  <tr><td class="id">D22</td><td>Lista única de requisitos por origem, importância de 1 a 5 e verificação por teste, análise ou demonstração</td><td>Saber o que fazer primeiro e o que pode ser cortado</td><td>set/2026</td></tr>
+  <tr><td class="id">D23</td><td>Regulamento de referência: FSAE Rules 2027 V1.0</td><td>Versão válida; nada do BMS mudou desde o rascunho</td><td>out/2026</td></tr>
+  <tr><td class="id">D24</td><td>Acumulador 140S3P em 5 módulos de 28S3P</td><td>Limite de 120 V por módulo <span class="cit">[FSAE, EV.5.1.1, p. 96]</span></td><td>nov/2026</td></tr>
+  <tr><td class="id">D25</td><td>Temperatura em 30% das células, um termistor para duas células, 13 por módulo</td><td>Meta da equipe acima dos 20% da regra <span class="cit">[FSAE, EV.8.5.5&ndash;6, p. 108]</span></td><td>nov/2026</td></tr>
+  <tr><td class="id">D26</td><td>4 CSCs por módulo, 20 na cadeia</td><td>Folga de canais de NTC; calor do balanceamento espalhado por 4 CIs</td><td>nov/2026</td></tr>
+  <tr><td class="id">D27</td><td>1 slave por módulo, com as 4 CSCs na mesma placa; 5 slaves no pack</td><td>Ligação por trilha dentro do módulo (D20); um chicote por módulo e menos conectores na cadeia</td><td>nov/2026</td></tr>
+  <tr><td class="id">D28</td><td>Pinos sem uso do TLE9012 conforme o datasheet: TMP e PWM por pull-down &gt; 10 kΩ, GPIO direto ao GND</td><td>Datasheet diverge do manual; é o documento mais novo <span class="cit">[DS12, p. 7&ndash;8]</span></td><td>nov/2026</td></tr>
+  <tr><td class="id">D29</td><td>Células nos canais 5 a 11 de cada TLE9012; canais 0 a 4 no T0; <code>PART_CONFIG = 0x0FE0</code></td><td>Arranjo do manual para menos de 12 células <span class="cit">[UM, Fig. 22, p. 27]</span></td><td>nov/2026</td></tr>
+  <tr><td class="id">D30</td><td>Ligação dos pinos do TLE9012 conforme a seção 14, com os valores da placa de avaliação V6</td><td>Manual, datasheet e placa da bancada concordam</td><td>nov/2026</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== 16 -->
+<h2 id="s16">17. Rastreabilidade</h2>
+
+<table>
+<thead><tr><td>Categoria</td><td>Itens</td></tr></thead>
+<tbody>
+  <tr><td class="sim">Confirmado em documento</td><td>Faixas de alimentação, velocidade da UART, desativação da UART pelo <code>VIO</code>, formato das mensagens, CRC8, watchdog, reset de registradores, registradores de multiread, fórmulas de tensão e de temperatura, tipos dos registradores de falha e itens do regulamento &mdash; todos citados no texto com página.</td></tr>
+  <tr><td class="sim">Confirmado em bancada</td><td>2 Mbit/s e MSB primeiro funcionando; CRC8 e CRC3; formato de 64 bytes do multiread; 12 &times; 1056 mV com 12,67 V; necessidade do <code>VIO</code>; ligação cruzada; armadilha do <code>I_NTC</code>; resistores de 5,1 kΩ por jumper nos canais de NTC da placa de avaliação, confirmados no esquemático.</td></tr>
+  <tr><td class="talvez">Cálculo meu</td><td>117,6 V por módulo e 588 V no pack; 13 termistores por módulo e 31,0%; limiares de temperatura em unidades do CI (60 °C &rarr; 292, 55 °C &rarr; 327); fator inteiro 25000/4096; tempo de byte de 5 µs; <code>PART_CONFIG = 0x0FE0</code>; R_BAL de ~8,2 Ω e ~2 W por grupo para 500 mA.</td></tr>
+  <tr><td class="nao">Não verificado</td><td>Ordem das células no multiread; curva do NTC (B = 3950 assumido); equivalência G491/G474 e recurso <em>MSB First</em> do USART (documentação da ST não está na pasta do projeto, embora o MSB primeiro funcione em bancada); CRC3, que vem da biblioteca de referência e não do manual; eventuais adendos da FSAE Brasil; tensão nominal do fusível 0437.500WRA da placa de avaliação; PMOS e R_B do balanceamento (ainda não escolhidos).</td></tr>
+</tbody>
+</table>
+
+<!-- ===================================================== 17 -->
+<h2 id="s17">18. Referências</h2>
+<ol class="refs">
+  <li><strong>[UM]</strong> Infineon, <em>TLE9012DQU, TLE9015DQU &mdash; User manual</em>, Rev. 1.0, Z8F80064984, 2022-01-24. <code>docs/infineon-infineon-tle9012dqu-tle9015dqu-um-en-usermanual-en.pdf</code></li>
+  <li><strong>[DS12]</strong> Infineon, <em>TLE9012DQU &mdash; Datasheet</em>, Rev. 2.0, 2023-11-02. <code>docs/TLE9012DQU - Data Sheet.pdf</code></li>
+  <li><strong>[DS15]</strong> Infineon, <em>TLE9015DQU &mdash; Datasheet</em>, Rev. 2.1, 2026-03-16. <code>docs/TLE9015DQU Data Sheet.pdf</code></li>
+  <li><strong>[FSAE]</strong> SAE International, <em>Formula SAE Rules 2027</em>, Version 1.0, 2026-09-01.</li>
+  <li><strong>[SCH]</strong> Infineon, <em>BMS Balancing and Sensing Board V6 &mdash; esquemático</em>, 4 folhas, 2021-07-02. <code>docs/TLE9012DQU_Eval_Board_v6_Sch.pdf</code></li>
+  <li><strong>[LIB]</strong> MaxMax-embedded, <em>TLE9012_Arduino_Lib</em>, licença MIT. <code>github.com/MaxMax-embedded/TLE9012_Arduino_Lib</code></li>
+  <li>STMicroelectronics, <em>RM0440 &mdash; STM32G4 reference manual</em> e <em>UM2505 &mdash; NUCLEO-G491RE user manual</em> (não estão na pasta do projeto).</li>
+</ol>
+
+<!-- ===================================================== A -->
+<h2 id="sA">Apêndice A &mdash; configuração do CubeMX</h2>
+
+<table>
+<thead><tr><td>Item</td><td>Configuração</td><td>Por quê</td></tr></thead>
+<tbody>
+  <tr><td>Clock</td><td>HSI16 &rarr; PLL = 170 MHz</td><td>170 MHz &divide; 2 Mbit/s = 85, divisor exato</td></tr>
+  <tr><td>USART1</td><td>PC4 (TX) e PC5 (RX), 2 000 000 bit/s, 8N1, oversampling 16</td><td>Link com o TLE9015</td></tr>
+  <tr class="destaque"><td>USART1 &rarr; Advanced</td><td>MSB First = Enable</td><td>O protocolo é MSB primeiro</td></tr>
+  <tr><td>DMA USART1_TX</td><td>Memória &rarr; periférico, modo Normal, byte</td><td>Bytes colados</td></tr>
+  <tr><td>DMA USART1_RX</td><td>Periférico &rarr; memória, modo Circular, byte</td><td>Recepção nunca para</td></tr>
+  <tr><td>NVIC</td><td>Interrupção global do USART1 ligada</td><td>Detectar fim de mensagem por linha ociosa</td></tr>
+  <tr><td>GPIO</td><td>PB0 = nSleep; PB1 = shutdown (pull-down externo); PC13 = botão azul; PA5 = LD2</td><td>&mdash;</td></tr>
+  <tr><td>FDCAN1</td><td>Fica para a fase 3</td><td>A Nucleo não tem transceiver CAN; precisa de um externo</td></tr>
+</tbody>
+</table>
 
 </main>
 
-<footer>
-  AMPERA &bull; Documento gerado em 2026-08-25
-</footer>
-
-</div><!-- .pagina -->
+<footer>AMPERA &bull; BMS &mdash; como o projeto foi feito &bull; Rev. 2.0 &bull; 2026-11-09</footer>
+</div>
 </body>
 </html>
