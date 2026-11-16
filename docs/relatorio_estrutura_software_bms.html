@@ -176,7 +176,7 @@ transformador (entre módulos). O STM32 só enxerga uma UART comum.</p>
   <tr><td>Slaves</td><td>1 por módulo, 5 no total</td><td>Decisão (D27)</td></tr>
   <tr><td>CSCs</td><td>4 por slave, 20 no total</td><td>Decisão (seção 13.2)</td></tr>
   <tr><td>Grupos 3P por CSC</td><td>7</td><td>28 grupos &divide; 4 CSCs</td></tr>
-  <tr><td>Termistores</td><td>13 por módulo, 65 no total</td><td>Meta de 30% das células (seção 13.2)</td></tr>
+  <tr><td>Termistores</td><td>20 por módulo, 100 no total (47,6% das células)</td><td>Todos os canais de NTC (seção 13.2)</td></tr>
 </tbody>
 </table>
 
@@ -473,7 +473,9 @@ cima dele ficaria entrando e saindo de falha sem parar. Então:</p>
   O regulamento pede temperatura abaixo de 60 °C <strong>considerando a exatidão da medição</strong>
   <span class="cit">[FSAE, EV.8.5.2, p. 108]</span>, e a inspeção não dá tolerância
   <span class="cit">[FSAE, IN.2.2.3, p. 115]</span>. Disparar em 60 °C exatos não atende. O limiar final
-  depende da exatidão do conjunto NTC + CI, que ainda vou levantar.
+  depende da exatidão do conjunto NTC + CI, que ainda vou levantar. Com o NTC escolhido (seção 14) e sem o
+  resistor de 5,1 kΩ da placa de avaliação, 60 °C corresponde a <code>RESULT</code> &asymp; 423 e 55 °C a &asymp; 503;
+  os valores atuais do firmware (292 e 327) só valiam com aquele resistor em paralelo.
 </div>
 
 <p><strong>Uma falha de cada vez na tela.</strong> O firmware mostra a falha mais grave numa variável do tipo
@@ -622,15 +624,16 @@ feito é falha. O bootloader, por exemplo, tem nota 2.</p>
 <ul>
   <li><strong>Pack de 140S.</strong> O limite de 120 V por módulo <span class="cit">[FSAE, EV.5.1.1, p. 96]</span>
       fixa 28 células em série por módulo (seção 2).</li>
-  <li><strong>Temperatura em 30% das células, com 4 CSCs por módulo.</strong> O regulamento pede no mínimo 20%
-      das células, distribuídas por todo o acumulador <span class="cit">[FSAE, EV.8.5.5, p. 108]</span>; a
-      equipe decidiu monitorar 30%. Um termistor pode valer por várias células se estiver em contato com o
-      terminal negativo de cada uma, ou no barramento a menos de 10 mm da solda
-      <span class="cit">[FSAE, EV.8.5.4 e EV.8.5.6, p. 108]</span>. No nosso 3P, cada termistor alcança duas
-      células. Então são 13 termistores por módulo, cobrindo 26 das 84 células (31,0%). Com 3 CSCs eu teria 15
-      canais e só 2 de folga; escolhi <strong>4 CSCs</strong>, que dão 20 canais e folga para termistores de
-      reserva. Como as 4 ficam na mesma placa slave, o calor do balanceamento também se espalha por 4 CIs
-      e por uma área maior.</li>
+  <li><strong>Temperatura em 47,6% das células, com 4 CSCs por módulo.</strong> O regulamento pede no mínimo
+      20% das células, distribuídas por todo o acumulador <span class="cit">[FSAE, EV.8.5.5, p. 108]</span>. Um
+      termistor pode valer por várias células se estiver em contato com o terminal negativo de cada uma, ou no
+      barramento a menos de 10 mm da solda <span class="cit">[FSAE, EV.8.5.4 e EV.8.5.6, p. 108]</span>. No nosso 3P,
+      cada termistor alcança duas células. A meta inicial era 30% (13 termistores por módulo), mas os 4 CSCs
+      dão 20 canais de NTC por módulo, e decidi usar <strong>todos</strong>: 20 termistores cobrem 40 das 84
+      células, 47,6%, sem nenhum CI a mais. Com 3 CSCs o teto seria 15 canais. Como as 4 CSCs ficam na mesma
+      placa slave, o calor do balanceamento também se espalha por 4 CIs e por uma área maior. Se o suporte
+      das células permitir um termistor alcançar as três células do grupo (arranjo em triângulo, com as
+      soldas puxadas para o centro), os mesmos 20 sensores chegam a 71,4%.</li>
   <li><strong>Fusível de sensoriamento de pelo menos 117,6 V.</strong> Cada fio de tensão precisa de proteção
       junto à aba da célula, com tensão nominal igual ou maior que a do módulo
       <span class="cit">[FSAE, EV.8.4.3, p. 107]</span>. O fusível de 63 V que eu tinha visto não serve.</li>
@@ -707,7 +710,7 @@ feito é falha. O bootloader, por exemplo, tem nota 2.</p>
   <tr><td class="id">R-58</td><td>ESF e datasheets na inspeção</td><td>Regra</td><td>IN.5.1</td><td class="num">5</td><td>Análise</td></tr>
   <tr><td class="id">R-59</td><td>Itens visíveis sem instrumentos</td><td>Regra</td><td>IN.2.3</td><td class="num">5</td><td>Análise</td></tr>
   <tr><td class="id">R-60</td><td>Falha coloca o carro em Red Car</td><td>Regra</td><td>EV.13.1b</td><td class="num">1</td><td>Análise</td></tr>
-  <tr><td class="id">R-61</td><td>4 CSCs por módulo, 7 grupos cada (48 canais de tensão para 28 grupos, 20 de NTC para 13)</td><td>Regra</td><td>EV.8.5.5a</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-61</td><td>4 CSCs por módulo, 7 grupos cada (48 canais de tensão para 28 grupos, 20 de NTC, todos usados)</td><td>Regra</td><td>EV.8.5.5a</td><td class="num">5</td><td>Análise</td></tr>
   <tr><td class="id">R-62</td><td>Transformador entre módulos</td><td>Regra</td><td>EV.8.3.2</td><td class="num">5</td><td>Teste</td></tr>
   <tr><td class="id">R-63</td><td>Exatidão de temperatura documentada</td><td>Regra</td><td>EV.8.5.2</td><td class="num">4</td><td>Análise</td></tr>
   <tr><td class="id">R-64</td><td>Detectar NTC aberto ou em curto</td><td>Regra</td><td>EV.8.3.4d</td><td class="num">5</td><td>Demonstração</td></tr>
@@ -727,7 +730,7 @@ feito é falha. O bootloader, por exemplo, tem nota 2.</p>
   <tr><td class="id">R-78</td><td>Watchdog do TLE9012 realimentado</td><td>Segurança</td><td>Bancada</td><td class="num">4</td><td>Teste</td></tr>
   <tr><td class="id">R-79</td><td>Topologia em anel — em aberto</td><td>Segurança</td><td>—</td><td class="num">3</td><td>Teste</td></tr>
   <tr><td class="id">R-80</td><td>Acumulador 140S3P em 5 módulos de 28S3P (420 células, 588 V)</td><td>Desempenho</td><td>—</td><td class="num">5</td><td>Análise</td></tr>
-  <tr><td class="id">R-80b</td><td>Cobertura de temperatura de 30% das células: 13 dos 20 NTCs por módulo, 65 no pack, 2 células por termistor</td><td>Desempenho</td><td>—</td><td class="num">4</td><td>Análise</td></tr>
+  <tr><td class="id">R-80b</td><td>Cobertura de temperatura de 47,6% das células: 20 NTCs por módulo (todos os canais), 100 no pack, 2 células por termistor</td><td>Desempenho</td><td>—</td><td class="num">4</td><td>Análise</td></tr>
   <tr><td class="id">R-81</td><td>Ciclo de leitura ≤ 100 ms</td><td>Desempenho</td><td>Objetivo 1</td><td class="num">4</td><td>Teste</td></tr>
   <tr><td class="id">R-82</td><td>Multiread por CSC</td><td>Desempenho</td><td>—</td><td class="num">3</td><td>Teste</td></tr>
   <tr><td class="id">R-83</td><td>Exatidão de tensão ≤ ±10 mV</td><td>Desempenho</td><td>Objetivo 4</td><td class="num">4</td><td>Teste</td></tr>
@@ -742,7 +745,7 @@ feito é falha. O bootloader, por exemplo, tem nota 2.</p>
   <tr><td class="id">R-92</td><td>Dados publicados na CAN</td><td>Interface</td><td>VCU</td><td class="num">4</td><td>Teste</td></tr>
   <tr><td class="id">R-93</td><td>Mensagens para o datalogger</td><td>Interface</td><td>Telemetria</td><td class="num">2</td><td>Teste</td></tr>
   <tr><td class="id">R-94</td><td>Transceiver CAN na master</td><td>Interface</td><td>—</td><td class="num">4</td><td>Análise</td></tr>
-  <tr><td class="id">R-95</td><td>20 canais de tensão ociosos por módulo no negativo da célula mais baixa usada; TMP ociosos por pull-down &gt; 10 kΩ</td><td>Interface</td><td>Datasheet</td><td class="num">4</td><td>Análise</td></tr>
+  <tr><td class="id">R-95</td><td>20 canais de tensão ociosos por módulo no negativo da célula mais baixa usada</td><td>Interface</td><td>Datasheet</td><td class="num">4</td><td>Análise</td></tr>
   <tr><td class="id">R-96</td><td>VS de cada CSC dentro da faixa</td><td>Interface</td><td>Datasheet</td><td class="num">4</td><td>Análise</td></tr>
   <tr><td class="id">R-97</td><td>VS e VIO do TLE9015 alimentados</td><td>Interface</td><td>Bancada</td><td class="num">4</td><td>Teste</td></tr>
   <tr><td class="id">R-98</td><td>Entradas e saídas de segurança</td><td>Interface</td><td>—</td><td class="num">5</td><td>Teste</td></tr>
@@ -780,8 +783,8 @@ bancada <span class="cit">[SCH, folhas 2 e 3]</span> e o circuito de balanceamen
   <tr><td class="num">1</td><td class="id">G5</td><td>Gate do PMOS do grupo T0&ndash;T1</td><td>100 nF até o U5 (C_FB)</td></tr>
   <tr><td class="num">2</td><td class="id">U5</td><td>T0</td><td>10 Ω em série (R_F); 330 nF até o U6 (C_F)</td></tr>
   <tr><td class="num">3&ndash;12</td><td class="id">G4&hellip;U0</td><td>GND local (T0)</td><td>Ligação direta; são os canais sem célula</td></tr>
-  <tr><td class="num">13</td><td class="id">TMP4</td><td>NTC, ou pull-down se sem uso</td><td>Ver "Termistores" abaixo</td></tr>
-  <tr><td class="num">14</td><td class="id">TMP3</td><td>NTC, ou pull-down se sem uso</td><td>Idem</td></tr>
+  <tr><td class="num">13</td><td class="id">TMP4</td><td>NTC</td><td>Ver "Termistores" abaixo</td></tr>
+  <tr><td class="num">14</td><td class="id">TMP3</td><td>NTC</td><td>Idem</td></tr>
   <tr><td class="num">15</td><td class="id">GND</td><td>T0</td><td>&mdash;</td></tr>
   <tr><td class="num">16</td><td class="id">TMP2</td><td>NTC</td><td>Idem</td></tr>
   <tr><td class="num">17</td><td class="id">TMP1</td><td>NTC</td><td>Idem</td></tr>
@@ -834,22 +837,36 @@ TLE9012 balanceia, ele puxa o Gn para o Un, e o PMOS liga com o gate uma tensão
 </tbody>
 </table>
 <div class="aviso">
-  <div class="rot">Valores em aberto</div>
-  O datasheet não dá valores para R_B e R_BAL. Pela minha conta, 500 mA a 4,2 V pedem R_BAL de cerca de 8,2 Ω,
-  o que dissipa uns 2 W por grupo, e o PMOS precisa conduzir bem com VGS de só &minus;2,5 V (célula vazia).
-  Com 28 grupos por slave, a corrente e o ciclo de trabalho têm de sair junto com a análise térmica.
+  <div class="rot">Componentes e limites</div>
+  <strong>PMOS: Infineon BSS215P</strong> (exigência: MOSFET da Infineon). &minus;20 V, ±12 V no gate, 280 mΩ máx. a
+  &minus;2,5 V e 150 mΩ máx. a &minus;4,5 V, limiar de &minus;0,6 a &minus;1,2 V, AEC-Q101
+  <span class="cit">[BSS215P, Rev. 2.3, p. 1&ndash;2]</span>. A 0,5 A ele dissipa no máximo uns 70 mW; o calor fica no
+  R_BAL. É sensível a ESD (classe 0, menos de 250 V) <span class="cit">[BSS215P, p. 1]</span>.<br>
+  <strong>Corrente de balanceamento: 500 mA no máximo.</strong> Pela minha conta, R_BAL de cerca de 9 Ω
+  (ex.: 2 &times; 18 Ω em paralelo) mantém a corrente abaixo de 500 mA mesmo com tolerância de 5% e célula a
+  4,2 V, e dissipa uns 2 W por grupo. Com 28 grupos por slave, o firmware limita quantos balanceiam ao mesmo
+  tempo e corta pela temperatura. O R_B fica em 10 kΩ (proposta minha; o datasheet não dá valor).
 </div>
 
 <h3>Termistores</h3>
 <ul>
-  <li><strong>Usar os canais a partir do TMP0, em sequência.</strong> A configuração ativa os canais em ordem a
-      partir do TMP0 <span class="cit">[UM, seç. 3.2.4, p. 54]</span>. Com 13 NTCs por slave, uma CSC usa TMP0 a TMP3
-      e as outras três usam TMP0 a TMP2. Cada CSC lê os NTCs dos seus próprios grupos.</li>
+  <li><strong>Todos os canais em uso.</strong> Cada CSC lê 5 NTCs (TMP0 a TMP4), nos seus próprios grupos;
+      são 20 por slave e 100 no pack. O round robin mede até dois por volta
+      <span class="cit">[UM, seç. 3.2.4, p. 54]</span>, então os 5 se atualizam em 3 voltas, cerca de 300 ms.</li>
+  <li><strong>Sensor: Eaton NRNE104F3950B1F</strong>, 10 kΩ ±1%, B25/50 = 3950 K ±1%, disco de 3 mm em epóxi,
+      de &minus;40 a 125 °C <span class="cit">[NTC, Tab. 1, p. 1; p. 3]</span>. A 60 °C ele vale 2,48 kΩ
+      <span class="cit">[NTC, p. 8]</span>. O firmware deve usar a tabela R-T do datasheet, não só a equação B.</li>
+  <li><strong>Montagem:</strong> colado no corpo de duas células vizinhas, um sensor para as duas. A lata da
+      célula está no potencial do terminal negativo, e é esse o argumento para a inspeção (ver o risco na D32).
+      Os terminais do sensor têm só 6,5 mm <span class="cit">[NTC, p. 2]</span>: a emenda até a slave usa fio de
+      pelo menos 600 V, com termorretrátil <span class="cit">[FSAE, EV.5.2.5]</span>.</li>
   <li><strong>Canal em uso:</strong> NTC entre o pino e o TMP_GND, com 100 Ω em série, 10 nF no pino e 4,7 nF no
       conector <span class="cit">[UM, Tab. 3, p. 23; SCH, folha 3]</span>.</li>
-  <li><strong>Canal sem uso:</strong> pull-down de mais de 10 kΩ ao GND <span class="cit">[DS12, p. 7]</span>.</li>
-  <li>O NTC encosta no barramento de outra célula, então precisa de isolação entre sensor e célula
-      <span class="cit">[FSAE, EV.8.5.7, p. 108]</span>.</li>
+  <li>Se algum canal ficar sem NTC no futuro, ele vai ao GND por pull-down de mais de 10 kΩ
+      <span class="cit">[DS12, p. 7]</span>.</li>
+  <li>O regulamento pede isolação entre sensor e célula, ou no circuito de medição
+      <span class="cit">[FSAE, EV.8.5.7, p. 108]</span>. O datasheet do sensor não especifica tensão de isolação
+      para o epóxi, então a isolação precisa vir da capa da célula ou de uma camada extra, documentada.</li>
 </ul>
 
 <h3>Comunicação dentro da slave</h3>
@@ -916,6 +933,7 @@ e decide no reset se atualiza ou pula para a aplicação.</p>
 <tbody>
   <tr><td>Célula do acumulador (a placa de pré-carga usa a Molicel P28A; falta confirmar para o BMS)</td><td>Limiares de tensão e temperatura, massa do módulo, dissipação do balanceamento</td></tr>
   <tr><td>Limiar final de sobretemperatura</td><td>Exatidão do conjunto NTC + CI</td></tr>
+  <tr><td>Aceitação do NTC no corpo da célula na inspeção</td><td>EV.8.5.3 e EV.8.5.4; uma Rules Question (GR.7) deixaria a aceitação por escrito</td></tr>
   <tr><td>Topologia em anel</td><td>Tolerância a um fio partido na cadeia</td></tr>
   <tr><td>Placa master própria</td><td>Entradas e saídas de segurança, alimentação do TLE9015</td></tr>
   <tr><td>Tempo máximo de reação a falhas</td><td>O regulamento não fixa valor</td></tr>
@@ -952,12 +970,16 @@ e decide no reset se atualiza ou pula para a aplicação.</p>
   <tr><td class="id">D22</td><td>Lista única de requisitos por origem, importância de 1 a 5 e verificação por teste, análise ou demonstração</td><td>Saber o que fazer primeiro e o que pode ser cortado</td><td>set/2026</td></tr>
   <tr><td class="id">D23</td><td>Regulamento de referência: FSAE Rules 2027 V1.0</td><td>Versão válida; nada do BMS mudou desde o rascunho</td><td>out/2026</td></tr>
   <tr><td class="id">D24</td><td>Acumulador 140S3P em 5 módulos de 28S3P</td><td>Limite de 120 V por módulo <span class="cit">[FSAE, EV.5.1.1, p. 96]</span></td><td>nov/2026</td></tr>
-  <tr><td class="id">D25</td><td>Temperatura em 30% das células, um termistor para duas células, 13 por módulo</td><td>Meta da equipe acima dos 20% da regra <span class="cit">[FSAE, EV.8.5.5&ndash;6, p. 108]</span></td><td>nov/2026</td></tr>
+  <tr><td class="id">D25</td><td>Temperatura em 30% das células, um termistor para duas células, 13 por módulo (substituída pela D31)</td><td>Meta da equipe acima dos 20% da regra <span class="cit">[FSAE, EV.8.5.5&ndash;6, p. 108]</span></td><td>nov/2026</td></tr>
   <tr><td class="id">D26</td><td>4 CSCs por módulo, 20 na cadeia</td><td>Folga de canais de NTC; calor do balanceamento espalhado por 4 CIs</td><td>nov/2026</td></tr>
   <tr><td class="id">D27</td><td>1 slave por módulo, com as 4 CSCs na mesma placa; 5 slaves no pack</td><td>Ligação por trilha dentro do módulo (D20); um chicote por módulo e menos conectores na cadeia</td><td>nov/2026</td></tr>
   <tr><td class="id">D28</td><td>Pinos sem uso do TLE9012 conforme o datasheet: TMP e PWM por pull-down &gt; 10 kΩ, GPIO direto ao GND</td><td>Datasheet diverge do manual; é o documento mais novo <span class="cit">[DS12, p. 7&ndash;8]</span></td><td>nov/2026</td></tr>
   <tr><td class="id">D29</td><td>Células nos canais 5 a 11 de cada TLE9012; canais 0 a 4 no T0; <code>PART_CONFIG = 0x0FE0</code></td><td>Arranjo do manual para menos de 12 células <span class="cit">[UM, Fig. 22, p. 27]</span></td><td>nov/2026</td></tr>
   <tr><td class="id">D30</td><td>Ligação dos pinos do TLE9012 conforme a seção 14, com os valores da placa de avaliação V6</td><td>Manual, datasheet e placa da bancada concordam</td><td>nov/2026</td></tr>
+  <tr><td class="id">D31</td><td>20 NTCs por módulo, todos os canais, 100 no pack: 47,6% das células</td><td>Usa os canais que os 4 CSCs já têm, sem CI a mais; folga contra perda de sensor</td><td>nov/2026</td></tr>
+  <tr><td class="id">D32</td><td>NTC Eaton NRNE104F3950B1F, colado no corpo de duas células vizinhas, um sensor para as duas</td><td>10 kΩ ±1%, B ±1%; a lata da célula está no potencial do negativo. <strong>Risco:</strong> o texto do EV.8.5.3 e do EV.8.5.4 pede contato com o terminal negativo ou com o barramento a menos de 10 mm da solda <span class="cit">[FSAE, p. 108]</span>; a aceitação depende do inspetor</td><td>nov/2026</td></tr>
+  <tr><td class="id">D33</td><td>Corrente de balanceamento de no máximo 500 mA por grupo</td><td>Equalização rápida (~10 min por 1% do grupo 3P); acima disso o calor e o fusível de sensoriamento pesam demais</td><td>nov/2026</td></tr>
+  <tr><td class="id">D34</td><td>PMOS do balanceamento: Infineon BSS215P, um por grupo (140 no pack)</td><td>MOSFET tem de ser Infineon; nível lógico de 2,5 V, ativo em produção, AEC-Q101 <span class="cit">[BSS215P, p. 1&ndash;2]</span></td><td>nov/2026</td></tr>
 </tbody>
 </table>
 
@@ -969,8 +991,8 @@ e decide no reset se atualiza ou pula para a aplicação.</p>
 <tbody>
   <tr><td class="sim">Confirmado em documento</td><td>Faixas de alimentação, velocidade da UART, desativação da UART pelo <code>VIO</code>, formato das mensagens, CRC8, watchdog, reset de registradores, registradores de multiread, fórmulas de tensão e de temperatura, tipos dos registradores de falha e itens do regulamento &mdash; todos citados no texto com página.</td></tr>
   <tr><td class="sim">Confirmado em bancada</td><td>2 Mbit/s e MSB primeiro funcionando; CRC8 e CRC3; formato de 64 bytes do multiread; 12 &times; 1056 mV com 12,67 V; necessidade do <code>VIO</code>; ligação cruzada; armadilha do <code>I_NTC</code>; resistores de 5,1 kΩ por jumper nos canais de NTC da placa de avaliação, confirmados no esquemático.</td></tr>
-  <tr><td class="talvez">Cálculo meu</td><td>117,6 V por módulo e 588 V no pack; 13 termistores por módulo e 31,0%; limiares de temperatura em unidades do CI (60 °C &rarr; 292, 55 °C &rarr; 327); fator inteiro 25000/4096; tempo de byte de 5 µs; <code>PART_CONFIG = 0x0FE0</code>; R_BAL de ~8,2 Ω e ~2 W por grupo para 500 mA.</td></tr>
-  <tr><td class="nao">Não verificado</td><td>Ordem das células no multiread; curva do NTC (B = 3950 assumido); equivalência G491/G474 e recurso <em>MSB First</em> do USART (documentação da ST não está na pasta do projeto, embora o MSB primeiro funcione em bancada); CRC3, que vem da biblioteca de referência e não do manual; eventuais adendos da FSAE Brasil; tensão nominal do fusível 0437.500WRA da placa de avaliação; PMOS e R_B do balanceamento (ainda não escolhidos).</td></tr>
+  <tr><td class="talvez">Cálculo meu</td><td>117,6 V por módulo e 588 V no pack; 20 termistores por módulo e 47,6%; atualização dos 5 NTCs de uma CSC em ~300 ms; 71,4% no arranjo em triângulo (distância de ~10,7 mm); limiares de temperatura em unidades do CI (60 °C &rarr; 292, 55 °C &rarr; 327); fator inteiro 25000/4096; tempo de byte de 5 µs; <code>PART_CONFIG = 0x0FE0</code>; R_BAL de ~8,2 Ω e ~2 W por grupo para 500 mA; limiares do NTC Eaton (60 °C &rarr; 423, 55 °C &rarr; 503).</td></tr>
+  <tr><td class="nao">Não verificado</td><td>Ordem das células no multiread; curva do MF52A usado na bancada (B = 3950 assumido); equivalência G491/G474 e recurso <em>MSB First</em> do USART (documentação da ST não está na pasta do projeto, embora o MSB primeiro funcione em bancada); CRC3, que vem da biblioteca de referência e não do manual; eventuais adendos da FSAE Brasil; tensão nominal do fusível 0437.500WRA da placa de avaliação; valor final do R_B e do R_BAL (propostos, não ensaiados); tensão de isolação do epóxi do NTC (o datasheet não especifica).</td></tr>
 </tbody>
 </table>
 
@@ -981,6 +1003,8 @@ e decide no reset se atualiza ou pula para a aplicação.</p>
   <li><strong>[DS12]</strong> Infineon, <em>TLE9012DQU &mdash; Datasheet</em>, Rev. 2.0, 2023-11-02. <code>docs/TLE9012DQU - Data Sheet.pdf</code></li>
   <li><strong>[DS15]</strong> Infineon, <em>TLE9015DQU &mdash; Datasheet</em>, Rev. 2.1, 2026-03-16. <code>docs/TLE9015DQU Data Sheet.pdf</code></li>
   <li><strong>[FSAE]</strong> SAE International, <em>Formula SAE Rules 2027</em>, Version 1.0, 2026-09-01.</li>
+  <li><strong>[BSS215P]</strong> Infineon, <em>BSS215P OptiMOS P2 Small-Signal-Transistor</em>, Rev. 2.3, 2011-07-08. <code>docs/infineon-bss215p-ds-en.pdf</code></li>
+  <li><strong>[NTC]</strong> Eaton, <em>NRNE Epoxy sealed radial lead NTC thermistor</em>, ELX1226, jul. 2022. <code>docs/eaton-nrne-epoxy-sealed-radial-lead-ntc-thermistor-data-sheet-elx1226.pdf</code></li>
   <li><strong>[SCH]</strong> Infineon, <em>BMS Balancing and Sensing Board V6 &mdash; esquemático</em>, 4 folhas, 2021-07-02. <code>docs/TLE9012DQU_Eval_Board_v6_Sch.pdf</code></li>
   <li><strong>[LIB]</strong> MaxMax-embedded, <em>TLE9012_Arduino_Lib</em>, licença MIT. <code>github.com/MaxMax-embedded/TLE9012_Arduino_Lib</code></li>
   <li>STMicroelectronics, <em>RM0440 &mdash; STM32G4 reference manual</em> e <em>UM2505 &mdash; NUCLEO-G491RE user manual</em> (não estão na pasta do projeto).</li>
