@@ -176,7 +176,7 @@ transformador (entre módulos). O STM32 só enxerga uma UART comum.</p>
   <tr><td>Slaves</td><td>1 por módulo, 5 no total</td><td>Decisão (D27)</td></tr>
   <tr><td>CSCs</td><td>4 por slave, 20 no total</td><td>Decisão (seção 13.2)</td></tr>
   <tr><td>Grupos 3P por CSC</td><td>7</td><td>28 grupos &divide; 4 CSCs</td></tr>
-  <tr><td>Termistores</td><td>20 por módulo, 100 no total (47,6% das células)</td><td>Todos os canais de NTC (seção 13.2)</td></tr>
+  <tr><td>Termistores</td><td>16 de célula por módulo (80 no pack, 38,1% das células) + 4 de placa por slave (20 no pack)</td><td>Todos os canais de NTC (seção 13.2)</td></tr>
 </tbody>
 </table>
 
@@ -624,16 +624,16 @@ feito é falha. O bootloader, por exemplo, tem nota 2.</p>
 <ul>
   <li><strong>Pack de 140S.</strong> O limite de 120 V por módulo <span class="cit">[FSAE, EV.5.1.1, p. 96]</span>
       fixa 28 células em série por módulo (seção 2).</li>
-  <li><strong>Temperatura em 47,6% das células, com 4 CSCs por módulo.</strong> O regulamento pede no mínimo
+  <li><strong>Temperatura em 38,1% das células, com 4 CSCs por módulo.</strong> O regulamento pede no mínimo
       20% das células, distribuídas por todo o acumulador <span class="cit">[FSAE, EV.8.5.5, p. 108]</span>. Um
       termistor pode valer por várias células se estiver em contato com o terminal negativo de cada uma, ou no
       barramento a menos de 10 mm da solda <span class="cit">[FSAE, EV.8.5.4 e EV.8.5.6, p. 108]</span>. No nosso 3P,
-      cada termistor alcança duas células. A meta inicial era 30% (13 termistores por módulo), mas os 4 CSCs
-      dão 20 canais de NTC por módulo, e decidi usar <strong>todos</strong>: 20 termistores cobrem 40 das 84
-      células, 47,6%, sem nenhum CI a mais. Com 3 CSCs o teto seria 15 canais. Como as 4 CSCs ficam na mesma
-      placa slave, o calor do balanceamento também se espalha por 4 CIs e por uma área maior. Se o suporte
-      das células permitir um termistor alcançar as três células do grupo (arranjo em triângulo, com as
-      soldas puxadas para o centro), os mesmos 20 sensores chegam a 71,4%.</li>
+      cada termistor alcança duas células. Os 4 CSCs dão 20 canais de NTC por módulo. Em cada CSC, 4 canais
+      vão para as células e 1 vai para um <strong>NTC de placa</strong>, no meio dos resistores de balanceamento,
+      porque o calor do balanceamento externo fica fora do CI e os sensores internos dele não o enxergam. São
+      16 termistores de célula por módulo, cobrindo 32 das 84 células: <strong>38,1%</strong>, acima da meta
+      de 30% e dos 20% da regra. Com 3 CSCs o teto seria 15 canais. Se o suporte das células permitir um
+      termistor alcançar as três células do grupo, os mesmos 16 sensores chegam a 57,1%.</li>
   <li><strong>Fusível de sensoriamento de pelo menos 117,6 V.</strong> Cada fio de tensão precisa de proteção
       junto à aba da célula, com tensão nominal igual ou maior que a do módulo
       <span class="cit">[FSAE, EV.8.4.3, p. 107]</span>. O fusível de 63 V que eu tinha visto não serve.</li>
@@ -704,8 +704,8 @@ feito é falha. O bootloader, por exemplo, tem nota 2.</p>
   <tr><td class="id">R-52</td><td>Isolação ≥ 500 Ω/V a 500 V</td><td>Regra</td><td>IN.10.2</td><td class="num">5</td><td>Teste</td></tr>
   <tr><td class="id">R-53</td><td>Proteção em todo fio de sensoriamento</td><td>Regra</td><td>EV.8.4.3</td><td class="num">5</td><td>Análise</td></tr>
   <tr><td class="id">R-54</td><td>Proteção junto à aba da célula</td><td>Regra</td><td>EV.8.4.3a</td><td class="num">5</td><td>Análise</td></tr>
-  <tr><td class="id">R-55</td><td>Rating ≥ tensão máxima do módulo (117,6 V)</td><td>Regra</td><td>EV.8.4.3b</td><td class="num">5</td><td>Análise</td></tr>
-  <tr><td class="id">R-56</td><td>Interrupção &gt; corrente de curto</td><td>Regra</td><td>EV.7.6.2c</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-55</td><td>Rating ≥ tensão máxima do módulo (117,6 V): 0678H1000-02, 125 VDC</td><td>Regra</td><td>EV.8.4.3b</td><td class="num">5</td><td>Análise</td></tr>
+  <tr><td class="id">R-56</td><td>Interrupção &gt; corrente de curto (~630 A; fusível de 2000 A)</td><td>Regra</td><td>EV.7.6.2c</td><td class="num">5</td><td>Análise</td></tr>
   <tr><td class="id">R-57</td><td>ESF do sistema elétrico</td><td>Regra</td><td>EV.2.1</td><td class="num">5</td><td>Análise</td></tr>
   <tr><td class="id">R-58</td><td>ESF e datasheets na inspeção</td><td>Regra</td><td>IN.5.1</td><td class="num">5</td><td>Análise</td></tr>
   <tr><td class="id">R-59</td><td>Itens visíveis sem instrumentos</td><td>Regra</td><td>IN.2.3</td><td class="num">5</td><td>Análise</td></tr>
@@ -730,7 +730,7 @@ feito é falha. O bootloader, por exemplo, tem nota 2.</p>
   <tr><td class="id">R-78</td><td>Watchdog do TLE9012 realimentado</td><td>Segurança</td><td>Bancada</td><td class="num">4</td><td>Teste</td></tr>
   <tr><td class="id">R-79</td><td>Topologia em anel — em aberto</td><td>Segurança</td><td>—</td><td class="num">3</td><td>Teste</td></tr>
   <tr><td class="id">R-80</td><td>Acumulador 140S3P em 5 módulos de 28S3P (420 células, 588 V)</td><td>Desempenho</td><td>—</td><td class="num">5</td><td>Análise</td></tr>
-  <tr><td class="id">R-80b</td><td>Cobertura de temperatura de 47,6% das células: 20 NTCs por módulo (todos os canais), 100 no pack, 2 células por termistor</td><td>Desempenho</td><td>—</td><td class="num">4</td><td>Análise</td></tr>
+  <tr><td class="id">R-80b</td><td>Cobertura de temperatura de 38,1% das células: 16 NTCs de célula por módulo (TMP1 a TMP4), 80 no pack, 2 células por termistor; mais 1 NTC de placa por CSC (TMP0)</td><td>Desempenho</td><td>—</td><td class="num">4</td><td>Análise</td></tr>
   <tr><td class="id">R-81</td><td>Ciclo de leitura ≤ 100 ms</td><td>Desempenho</td><td>Objetivo 1</td><td class="num">4</td><td>Teste</td></tr>
   <tr><td class="id">R-82</td><td>Multiread por CSC</td><td>Desempenho</td><td>—</td><td class="num">3</td><td>Teste</td></tr>
   <tr><td class="id">R-83</td><td>Exatidão de tensão ≤ ±10 mV</td><td>Desempenho</td><td>Objetivo 4</td><td class="num">4</td><td>Teste</td></tr>
@@ -780,15 +780,15 @@ bancada <span class="cit">[SCH, folhas 2 e 3]</span> e o circuito de balanceamen
 <table>
 <thead><tr><td>Pino</td><td>Nome</td><td>Liga em</td><td>Componentes</td></tr></thead>
 <tbody>
-  <tr><td class="num">1</td><td class="id">G5</td><td>Gate do PMOS do grupo T0&ndash;T1</td><td>100 nF até o U5 (C_FB)</td></tr>
+  <tr><td class="num">1</td><td class="id">G5</td><td>Gate do PMOS do grupo T0&ndash;T1</td><td>1 nF até o U5 (C_FB)</td></tr>
   <tr><td class="num">2</td><td class="id">U5</td><td>T0</td><td>10 Ω em série (R_F); 330 nF até o U6 (C_F)</td></tr>
   <tr><td class="num">3&ndash;12</td><td class="id">G4&hellip;U0</td><td>GND local (T0)</td><td>Ligação direta; são os canais sem célula</td></tr>
-  <tr><td class="num">13</td><td class="id">TMP4</td><td>NTC</td><td>Ver "Termistores" abaixo</td></tr>
+  <tr><td class="num">13</td><td class="id">TMP4</td><td>NTC de célula</td><td>Ver "Termistores" abaixo</td></tr>
   <tr><td class="num">14</td><td class="id">TMP3</td><td>NTC</td><td>Idem</td></tr>
   <tr><td class="num">15</td><td class="id">GND</td><td>T0</td><td>&mdash;</td></tr>
   <tr><td class="num">16</td><td class="id">TMP2</td><td>NTC</td><td>Idem</td></tr>
   <tr><td class="num">17</td><td class="id">TMP1</td><td>NTC</td><td>Idem</td></tr>
-  <tr><td class="num">18</td><td class="id">TMP0</td><td>NTC</td><td>Idem</td></tr>
+  <tr><td class="num">18</td><td class="id">TMP0</td><td>NTC de placa, no meio dos R_BAL</td><td>Idem</td></tr>
   <tr><td class="num">19</td><td class="id">TMP_GND</td><td>Retorno dos NTCs, ao GND local</td><td>Pode ir direto ao GND <span class="cit">[DS12, p. 7]</span>; a placa de avaliação usa 0 Ω</td></tr>
   <tr><td class="num">20</td><td class="id">PWM1</td><td>GND</td><td>Pull-down de 33 kΩ <span class="cit">[DS12, p. 7]</span></td></tr>
   <tr><td class="num">21</td><td class="id">PWM0</td><td>GND</td><td>Pull-down de 33 kΩ</td></tr>
@@ -807,17 +807,17 @@ bancada <span class="cit">[SCH, folhas 2 e 3]</span> e o circuito de balanceamen
   <tr><td class="num">34</td><td class="id">VS</td><td>T7</td><td>5,1 Ω em série; 100 nF + 1 nF ao GND; rotear longe do U12 <span class="cit">[UM, p. 25]</span></td></tr>
   <tr><td class="num">35</td><td class="id">U12P</td><td>T7</td><td>10 Ω, 100 nF ao GND, depois 5,1 Ω até o pino</td></tr>
   <tr><td class="num">36</td><td class="id">U12</td><td>T7</td><td>10 Ω em série; 330 nF até o U11, colado nos pinos <span class="cit">[UM, p. 24]</span></td></tr>
-  <tr><td class="num">37</td><td class="id">G11</td><td>Gate do PMOS do grupo T6&ndash;T7</td><td>100 nF até o U11</td></tr>
+  <tr><td class="num">37</td><td class="id">G11</td><td>Gate do PMOS do grupo T6&ndash;T7</td><td>1 nF até o U11</td></tr>
   <tr><td class="num">38</td><td class="id">U11</td><td>T6</td><td>10 Ω em série; 330 nF até o U10</td></tr>
-  <tr><td class="num">39</td><td class="id">G10</td><td>Gate do PMOS do grupo T5&ndash;T6</td><td>100 nF até o U10</td></tr>
+  <tr><td class="num">39</td><td class="id">G10</td><td>Gate do PMOS do grupo T5&ndash;T6</td><td>1 nF até o U10</td></tr>
   <tr><td class="num">40</td><td class="id">U10</td><td>T5</td><td>10 Ω em série; 330 nF até o U9</td></tr>
-  <tr><td class="num">41</td><td class="id">G9</td><td>Gate do PMOS do grupo T4&ndash;T5</td><td>100 nF até o U9</td></tr>
+  <tr><td class="num">41</td><td class="id">G9</td><td>Gate do PMOS do grupo T4&ndash;T5</td><td>1 nF até o U9</td></tr>
   <tr><td class="num">42</td><td class="id">U9</td><td>T4</td><td>10 Ω em série; 330 nF até o U8</td></tr>
-  <tr><td class="num">43</td><td class="id">G8</td><td>Gate do PMOS do grupo T3&ndash;T4</td><td>100 nF até o U8</td></tr>
+  <tr><td class="num">43</td><td class="id">G8</td><td>Gate do PMOS do grupo T3&ndash;T4</td><td>1 nF até o U8</td></tr>
   <tr><td class="num">44</td><td class="id">U8</td><td>T3</td><td>10 Ω em série; 330 nF até o U7</td></tr>
-  <tr><td class="num">45</td><td class="id">G7</td><td>Gate do PMOS do grupo T2&ndash;T3</td><td>100 nF até o U7</td></tr>
+  <tr><td class="num">45</td><td class="id">G7</td><td>Gate do PMOS do grupo T2&ndash;T3</td><td>1 nF até o U7</td></tr>
   <tr><td class="num">46</td><td class="id">U7</td><td>T2</td><td>10 Ω em série; 330 nF até o U6</td></tr>
-  <tr><td class="num">47</td><td class="id">G6</td><td>Gate do PMOS do grupo T1&ndash;T2</td><td>100 nF até o U6</td></tr>
+  <tr><td class="num">47</td><td class="id">G6</td><td>Gate do PMOS do grupo T1&ndash;T2</td><td>1 nF até o U6</td></tr>
   <tr><td class="num">48</td><td class="id">U6</td><td>T1</td><td>10 Ω em série; 330 nF até o U5</td></tr>
   <tr><td class="num">49</td><td class="id">Pad</td><td>GND</td><td>Vias térmicas; a placa de teste da Infineon usa 16 de 0,3 mm <span class="cit">[DS12, p. 13]</span></td></tr>
 </tbody>
@@ -845,14 +845,20 @@ TLE9012 balanceia, ele puxa o Gn para o Un, e o PMOS liga com o gate uma tensão
   <strong>Corrente de balanceamento: 500 mA no máximo.</strong> Pela minha conta, R_BAL de cerca de 9 Ω
   (ex.: 2 &times; 18 Ω em paralelo) mantém a corrente abaixo de 500 mA mesmo com tolerância de 5% e célula a
   4,2 V, e dissipa uns 2 W por grupo. Com 28 grupos por slave, o firmware limita quantos balanceiam ao mesmo
-  tempo e corta pela temperatura. O R_B fica em 10 kΩ (proposta minha; o datasheet não dá valor).
+  tempo e corta pela temperatura. O R_B fica em 10 kΩ e o C_FB em 1 nF. O C_FB carrega pelo R_B quando o balanceamento desliga, então a constante de tempo é R_B &times; C_FB = 10 µs e o PMOS desliga em ~20 µs, bem antes da medição, que o CI atrasa em até ~1,13 ms <span class="cit">[DS12, PRQ-594, p. 26]</span>. Os 100 nF da tabela do manual valem para o balanceamento interno, em que o capacitor carrega pelo R_BAL de 41 Ω <span class="cit">[UM, Tab. 1, p. 20]</span>; com 10 kΩ, 100 nF deixariam o PMOS ligado durante a medição (cálculo meu).
 </div>
 
 <h3>Termistores</h3>
 <ul>
-  <li><strong>Todos os canais em uso.</strong> Cada CSC lê 5 NTCs (TMP0 a TMP4), nos seus próprios grupos;
-      são 20 por slave e 100 no pack. O round robin mede até dois por volta
-      <span class="cit">[UM, seç. 3.2.4, p. 54]</span>, então os 5 se atualizam em 3 voltas, cerca de 300 ms.</li>
+  <li><strong>Todos os canais em uso.</strong> Em cada CSC, o TMP0 lê um NTC SMD na placa, no meio dos 14 R_BAL, e TMP1 a TMP4
+      leem 4 NTCs colados nas suas próprias células. São 16 NTCs de célula e 4 de placa por
+      slave. O round robin mede até dois por volta <span class="cit">[UM, seç. 3.2.4, p. 54]</span>, então os 5 se
+      atualizam em 3 voltas, cerca de 300 ms.</li>
+  <li><strong>NTC de placa: Bourns BTN06G103H3HF1T0A</strong>, 10 kΩ ±3%, B25/50 = 3380 K ±1%, 0603, de &minus;40 a
+      125 °C <span class="cit">[NTC2, p. 1&ndash;2]</span>, com a mesma rede de filtro dos outros canais. ±3% dá
+      cerca de ±1 °C a 60 °C (cálculo meu), suficiente para o firmware reduzir o PWM de balanceamento quando a
+      placa esquenta. A curva é diferente da dos NTCs de célula (3380 K contra 3950 K), então o TMP0 tem tabela
+      de conversão própria.</li>
   <li><strong>Sensor: Eaton NRNE104F3950B1F</strong>, 10 kΩ ±1%, B25/50 = 3950 K ±1%, disco de 3 mm em epóxi,
       de &minus;40 a 125 °C <span class="cit">[NTC, Tab. 1, p. 1; p. 3]</span>. A 60 °C ele vale 2,48 kΩ
       <span class="cit">[NTC, p. 8]</span>. O firmware deve usar a tabela R-T do datasheet, não só a equação B.</li>
@@ -876,11 +882,62 @@ de tensão é de uns 29,4 V, e o manual diz que 100 V bastam para o capacitor em
 pede mais <span class="cit">[UM, Tab. 2, p. 22]</span>. A terminação de 100 Ω com 250 pF só vai no último nó da
 cadeia, a CSC 20, e é opcional <span class="cit">[UM, Tab. 4, p. 24]</span>.</p>
 
+<h3>Transformador entre módulos e no master</h3>
+<div class="decisao">
+  <div class="rot">Decisão</div>
+  <div class="peca">Pulse HM2108NL</div>
+  <p>Transformador 1:1 com filtro de modo comum embutido, <strong>1000 VDC de tensão de trabalho por 15 anos</strong>,
+  4300 VDC de teste por 60 s, isolação básica (IEC 60664 / ISO 6469), creepage interno maior que 11 mm, AEC-Q200,
+  de &minus;40 a 125 °C <span class="cit">[TRAFO, folha 2]</span>. Um na entrada de cada slave e um no master: 6 no pack.</p>
+</div>
+<p>A ligação segue o esquemático da Infineon com transformador <span class="cit">[UM, Fig. 24, p. 29]</span>: em cada
+linha, 39 Ω, 220 pF opcional ao GND local e 1 nF em série; os dois 1 nF entram no enrolamento do lado do CI, e cada
+enrolamento leva um resistor de amortecimento R_N em paralelo. Com o transformador fazendo a isolação, o 1 nF pode ser
+de 100 V <span class="cit">[UM, Tab. 5, p. 30]</span>. O lado do filtro de modo comum fica virado para o cabo.</p>
+<div class="aviso">
+  <div class="rot">A conferir em bancada e no layout</div>
+  <ul>
+    <li><strong>R_N:</strong> o HM2108NL não é um dos modelos citados no manual. Começo com 1 kΩ, o valor indicado para
+        o HM2116ANL da mesma família <span class="cit">[UM, Tab. 5, p. 30]</span>, e ajusto olhando o sinal.</li>
+    <li><strong>Pinagem</strong> <span class="cit">[TRAFO, folha 2]</span>: lado do CI nos pinos 1 (H) e 3 (L); lado do
+        cabo, com o filtro de modo comum, nos pinos 6 (H) e 4 (L). Os center taps (2 e 5) ficam sem ligação. Os pontos
+        de polaridade estão no pino 1 e no lado do pino 6, então H entra no 1 e sai no 6. R_N entre 1 e 3 e entre 6 e 4.</li>
+    <li><strong>Master:</strong> é a fronteira entre TS e GLV. Se as duas partes ficarem na mesma placa, o regulamento
+        pede 20 mm de creepage sem verniz para 300 a 600 V <span class="cit">[FSAE, EV.7.5.7, p. 104]</span>, e os pads
+        dos dois lados do transformador ficam a ~13,7 mm <span class="cit">[TRAFO, folha 3]</span>: a região precisa de
+        verniz isolante ou de um rasgo na placa.</li>
+  </ul>
+</div>
+
 <h3>Fusíveis de sensoriamento</h3>
-<p>A placa de avaliação tem um fusível de 0,5 A (0437.500WRA) em cada fio de célula, logo no conector
-<span class="cit">[SCH, folha 2]</span>. O regulamento pede que a proteção fique no condutor ligado direto à aba
-da célula, com tensão nominal de pelo menos 117,6 V <span class="cit">[FSAE, EV.8.4.3, p. 107]</span>. Ainda não
-conferi a tensão nominal desse fusível.</p>
+<div class="decisao">
+  <div class="rot">Decisão</div>
+  <div class="peca">Bel 0678H1000-02</div>
+  <p>Fusível de 1 A, 125 VDC, tamanho 3912, com capacidade de interrupção de <strong>2000 A a 125 VDC</strong>
+  <span class="cit">[FUS, p. 1]</span> e resistência a frio de 0,21 Ω <span class="cit">[FUS, p. 2]</span>. Um por fio de
+  sensoriamento: 29 por módulo, 145 no pack.</p>
+</div>
+
+<p><strong>Onde fica.</strong> Em cada tomada, logo depois da célula e antes de qualquer outra ligação (PMOS, R_BAL,
+R_F), no condutor ligado direto à aba <span class="cit">[FSAE, EV.8.4.3a, p. 107]</span>. Fica junto às abas, e não
+na slave. As tomadas compartilhadas entre CSCs (TAP07, TAP14, TAP21) usam um fio e um fusível só.</p>
+
+<p><strong>Por que esse.</strong> Três exigências fecharam a escolha:</p>
+<ul>
+  <li><strong>Tensão:</strong> 125 VDC, acima dos 117,6 V do módulo <span class="cit">[FSAE, EV.8.4.3b, p. 107]</span>.</li>
+  <li><strong>Corrente:</strong> os 500 mA de balanceamento passam pelo fusível o tempo todo, então ele trabalha a 50%
+      da nominal. A versão de 630 mA ficaria em 79%, e o datasheet avisa que a série não deve operar entre 100% e
+      200% da nominal <span class="cit">[FUS, p. 2]</span>.</li>
+  <li><strong>Interrupção:</strong> tem de passar da corrente de curto teórica
+      <span class="cit">[FSAE, EV.7.6.2c, p. 104]</span>. O pior caso é um curto entre dois fios logo depois dos
+      fusíveis. Num curto que pega n grupos, a tensão é n &times; 4,2 V e a resistência é n &times; 6,7 mΩ (20 mΩ por
+      célula da P28A <span class="cit">[P28A, p. 1]</span>, três em paralelo), e a corrente fica em
+      <strong>~630 A para qualquer n</strong> (cálculo meu). Como 20 mΩ é o máximo da célula, uma célula melhor dá
+      mais corrente; os 2000 A cobrem isso com folga. Fusíveis de 125 V comuns interrompem 100 a 300 A e não
+      serviriam.</li>
+</ul>
+<p>O fusível só precisa aguentar a tensão do módulo porque os fios de módulos diferentes nunca se encontram: cada
+módulo tem o seu chicote, separado dos outros.</p>
 
 <!-- ===================================================== 14 -->
 <h2 id="s14">15. Próximos passos</h2>
@@ -906,7 +963,7 @@ conferi a tensão nominal desse fusível.</p>
 <ol>
   <li><strong>Placa slave própria</strong>, uma por módulo, com 4 TLE9012 ligados por trilha (acoplamento
       capacitivo) e balanceamento externo por PMOS (corrente maior que os 200 mA do
-      CI), fusíveis de sensoriamento de pelo menos 117,6 V e afastamentos de isolação do regulamento
+      CI), fusíveis de sensoriamento Bel 0678H1000-02 junto às abas e afastamentos de isolação do regulamento
       <span class="cit">[FSAE, EV.7.5.7, p. 104]</span>.</li>
   <li><strong>Ligação de cada pino do TLE9012</strong>: definida na seção 14.</li>
   <li><strong>Valores do balanceamento externo</strong>: PMOS, R_B e R_BAL, junto com a análise térmica.</li>
@@ -976,10 +1033,15 @@ e decide no reset se atualiza ou pula para a aplicação.</p>
   <tr><td class="id">D28</td><td>Pinos sem uso do TLE9012 conforme o datasheet: TMP e PWM por pull-down &gt; 10 kΩ, GPIO direto ao GND</td><td>Datasheet diverge do manual; é o documento mais novo <span class="cit">[DS12, p. 7&ndash;8]</span></td><td>nov/2026</td></tr>
   <tr><td class="id">D29</td><td>Células nos canais 5 a 11 de cada TLE9012; canais 0 a 4 no T0; <code>PART_CONFIG = 0x0FE0</code></td><td>Arranjo do manual para menos de 12 células <span class="cit">[UM, Fig. 22, p. 27]</span></td><td>nov/2026</td></tr>
   <tr><td class="id">D30</td><td>Ligação dos pinos do TLE9012 conforme a seção 14, com os valores da placa de avaliação V6</td><td>Manual, datasheet e placa da bancada concordam</td><td>nov/2026</td></tr>
-  <tr><td class="id">D31</td><td>20 NTCs por módulo, todos os canais, 100 no pack: 47,6% das células</td><td>Usa os canais que os 4 CSCs já têm, sem CI a mais; folga contra perda de sensor</td><td>nov/2026</td></tr>
+  <tr><td class="id">D31</td><td>20 NTCs por módulo, todos os canais, 100 no pack: 47,6% das células (substituída pela D37)</td><td>Usa os canais que os 4 CSCs já têm, sem CI a mais; folga contra perda de sensor</td><td>nov/2026</td></tr>
   <tr><td class="id">D32</td><td>NTC Eaton NRNE104F3950B1F, colado no corpo de duas células vizinhas, um sensor para as duas</td><td>10 kΩ ±1%, B ±1%; a lata da célula está no potencial do negativo. <strong>Risco:</strong> o texto do EV.8.5.3 e do EV.8.5.4 pede contato com o terminal negativo ou com o barramento a menos de 10 mm da solda <span class="cit">[FSAE, p. 108]</span>; a aceitação depende do inspetor</td><td>nov/2026</td></tr>
   <tr><td class="id">D33</td><td>Corrente de balanceamento de no máximo 500 mA por grupo</td><td>Equalização rápida (~10 min por 1% do grupo 3P); acima disso o calor e o fusível de sensoriamento pesam demais</td><td>nov/2026</td></tr>
   <tr><td class="id">D34</td><td>PMOS do balanceamento: Infineon BSS215P, um por grupo (140 no pack)</td><td>MOSFET tem de ser Infineon; nível lógico de 2,5 V, ativo em produção, AEC-Q101 <span class="cit">[BSS215P, p. 1&ndash;2]</span></td><td>nov/2026</td></tr>
+  <tr><td class="id">D35</td><td>Fusível de sensoriamento Bel 0678H1000-02 (1 A, 125 VDC, 2000 A DC), um por fio: 29 por módulo, 145 no pack</td><td>Curto teórico de ~630 A; 500 mA de balanceamento a 50% da nominal <span class="cit">[FUS, p. 1&ndash;2]</span></td><td>nov/2026</td></tr>
+  <tr><td class="id">D36</td><td>R_B = 10 kΩ e C_FB = 1 nF no balanceamento externo; um R_F por tomada (8 por CSC)</td><td>τ de 10 µs: o PMOS desliga antes da medição; com 100 nF levaria ~1,5 ms (cálculo meu)</td><td>nov/2026</td></tr>
+  <tr><td class="id">D37</td><td>Por CSC: 1 NTC de placa (TMP0) no meio dos R_BAL e 4 NTCs de célula (TMP1&ndash;TMP4); 80 de célula e 20 de placa no pack</td><td>O calor do balanceamento externo fica fora do CI; a cobertura das células cai para 38,1%, ainda acima da meta de 30%</td><td>nov/2026</td></tr>
+  <tr><td class="id">D38</td><td>NTC de placa: Bourns BTN06G103H3HF1T0A (10 kΩ ±3%, B 3380 K), 1 por CSC, 20 no pack</td><td>Só controla o balanceamento pela temperatura da placa; ±1 °C basta <span class="cit">[NTC2, p. 1&ndash;2]</span></td><td>nov/2026</td></tr>
+  <tr><td class="id">D39</td><td>Transformador da iso UART: Pulse HM2108NL, 1 por slave e 1 no master (6 no pack); R_N inicial de 1 kΩ</td><td>1000 VDC de trabalho cobre os 588 V do pack; AEC-Q200; filtro de modo comum embutido <span class="cit">[TRAFO, folha 2]</span></td><td>nov/2026</td></tr>
 </tbody>
 </table>
 
@@ -991,8 +1053,8 @@ e decide no reset se atualiza ou pula para a aplicação.</p>
 <tbody>
   <tr><td class="sim">Confirmado em documento</td><td>Faixas de alimentação, velocidade da UART, desativação da UART pelo <code>VIO</code>, formato das mensagens, CRC8, watchdog, reset de registradores, registradores de multiread, fórmulas de tensão e de temperatura, tipos dos registradores de falha e itens do regulamento &mdash; todos citados no texto com página.</td></tr>
   <tr><td class="sim">Confirmado em bancada</td><td>2 Mbit/s e MSB primeiro funcionando; CRC8 e CRC3; formato de 64 bytes do multiread; 12 &times; 1056 mV com 12,67 V; necessidade do <code>VIO</code>; ligação cruzada; armadilha do <code>I_NTC</code>; resistores de 5,1 kΩ por jumper nos canais de NTC da placa de avaliação, confirmados no esquemático.</td></tr>
-  <tr><td class="talvez">Cálculo meu</td><td>117,6 V por módulo e 588 V no pack; 20 termistores por módulo e 47,6%; atualização dos 5 NTCs de uma CSC em ~300 ms; 71,4% no arranjo em triângulo (distância de ~10,7 mm); limiares de temperatura em unidades do CI (60 °C &rarr; 292, 55 °C &rarr; 327); fator inteiro 25000/4096; tempo de byte de 5 µs; <code>PART_CONFIG = 0x0FE0</code>; R_BAL de ~8,2 Ω e ~2 W por grupo para 500 mA; limiares do NTC Eaton (60 °C &rarr; 423, 55 °C &rarr; 503).</td></tr>
-  <tr><td class="nao">Não verificado</td><td>Ordem das células no multiread; curva do MF52A usado na bancada (B = 3950 assumido); equivalência G491/G474 e recurso <em>MSB First</em> do USART (documentação da ST não está na pasta do projeto, embora o MSB primeiro funcione em bancada); CRC3, que vem da biblioteca de referência e não do manual; eventuais adendos da FSAE Brasil; tensão nominal do fusível 0437.500WRA da placa de avaliação; valor final do R_B e do R_BAL (propostos, não ensaiados); tensão de isolação do epóxi do NTC (o datasheet não especifica).</td></tr>
+  <tr><td class="talvez">Cálculo meu</td><td>117,6 V por módulo e 588 V no pack; 16 termistores de célula por módulo e 38,1%; atualização dos 5 NTCs de uma CSC em ~300 ms; 57,1% no arranjo em triângulo (distância de ~10,7 mm); limiares de temperatura em unidades do CI (60 °C &rarr; 292, 55 °C &rarr; 327); fator inteiro 25000/4096; tempo de byte de 5 µs; <code>PART_CONFIG = 0x0FE0</code>; R_BAL de ~8,2 Ω e ~2 W por grupo para 500 mA; corrente de curto dos fios de sensoriamento ~630 A; limiares do NTC Eaton (60 °C &rarr; 423, 55 °C &rarr; 503).</td></tr>
+  <tr><td class="nao">Não verificado</td><td>Ordem das células no multiread; curva do MF52A usado na bancada (B = 3950 assumido); equivalência G491/G474 e recurso <em>MSB First</em> do USART (documentação da ST não está na pasta do projeto, embora o MSB primeiro funcione em bancada); CRC3, que vem da biblioteca de referência e não do manual; eventuais adendos da FSAE Brasil; tensão nominal do fusível 0437.500WRA da placa de avaliação; valor final do R_B e do R_BAL (propostos, não ensaiados); tensão de isolação do epóxi do NTC (o datasheet não especifica); valor final do R_N do HM2108NL.</td></tr>
 </tbody>
 </table>
 
@@ -1003,6 +1065,10 @@ e decide no reset se atualiza ou pula para a aplicação.</p>
   <li><strong>[DS12]</strong> Infineon, <em>TLE9012DQU &mdash; Datasheet</em>, Rev. 2.0, 2023-11-02. <code>docs/TLE9012DQU - Data Sheet.pdf</code></li>
   <li><strong>[DS15]</strong> Infineon, <em>TLE9015DQU &mdash; Datasheet</em>, Rev. 2.1, 2026-03-16. <code>docs/TLE9015DQU Data Sheet.pdf</code></li>
   <li><strong>[FSAE]</strong> SAE International, <em>Formula SAE Rules 2027</em>, Version 1.0, 2026-09-01.</li>
+  <li><strong>[TRAFO]</strong> Pulse Electronics, <em>HM2108NL &mdash; Transformer/CMC, 4.3 kVDC isolation, SMT</em>, rev. D, 2017. <code>docs/HM2108NL.pdf</code></li>
+  <li><strong>[NTC2]</strong> Bourns, <em>BTN06G Series SMD NTC Thermistor for Thermal Sense</em>, rev. 08/26. <code>docs/Bourns_08-20-2026_BTN06G.pdf</code></li>
+  <li><strong>[FUS]</strong> Bel Fuse, <em>Type 0678H Enhanced-breaking Capability Brick Fuse</em>, rev. jul. 2026. <code>docs/ds_cp_0678h_series.pdf</code></li>
+  <li><strong>[P28A]</strong> Molicel, <em>INR-18650-P28A Product Data Sheet</em>, versão 1.3. <code>docs/INR18650P28A_1.3_Product-Data-Sheet-of-INR-18650-P28A-80093.pdf</code></li>
   <li><strong>[BSS215P]</strong> Infineon, <em>BSS215P OptiMOS P2 Small-Signal-Transistor</em>, Rev. 2.3, 2011-07-08. <code>docs/infineon-bss215p-ds-en.pdf</code></li>
   <li><strong>[NTC]</strong> Eaton, <em>NRNE Epoxy sealed radial lead NTC thermistor</em>, ELX1226, jul. 2022. <code>docs/eaton-nrne-epoxy-sealed-radial-lead-ntc-thermistor-data-sheet-elx1226.pdf</code></li>
   <li><strong>[SCH]</strong> Infineon, <em>BMS Balancing and Sensing Board V6 &mdash; esquemático</em>, 4 folhas, 2021-07-02. <code>docs/TLE9012DQU_Eval_Board_v6_Sch.pdf</code></li>

@@ -31,6 +31,13 @@ RemoteSystemsTempFiles/
 docs/*usermanual*.pdf
 docs/*datasheet*.pdf
 
+# Datasheets dos componentes da slave (copyright do fabricante; o do
+# HM2108NL e marcado "Pulse confidential & proprietary"). Citados no
+# relatorio pelo nome e revisao; baixar do site de cada fabricante.
+docs/HM2108NL.pdf
+docs/Bourns_08-20-2026_BTN06G.pdf
+docs/ds_cp_0678h_series.pdf
+
 # ---------------------------------------------------------------------------
 # Sistema operacional
 # ---------------------------------------------------------------------------
