@@ -241,8 +241,9 @@ Registradas porque nenhuma delas é óbvia no datasheet e todas custaram tempo:
 
 - Infineon, *TLE9012DQU / TLE9015DQU User Manual*, Rev. 1.0 (Z8F80064984) —
   [infineon.com](https://www.infineon.com/battery-management-systems).
-  **Não versionado neste repositório** (copyright de terceiros, ~17 MB); baixar e
-  colocar em `docs/`.
+- **Manuais, datasheets e esquemáticos de fabricante não são versionados** (copyright
+  de terceiros). A lista completa, com revisão, está na seção Referências do relatório;
+  baixar do site de cada fabricante e colocar em `docs/`.
 - STMicroelectronics, *RM0440* — Reference Manual da série STM32G4.
 - [MaxMax-embedded/TLE9012_Arduino_Lib](https://github.com/MaxMax-embedded/TLE9012_Arduino_Lib) —
   implementação de referência, licença MIT. Fonte do mapa de registradores e da

@@ -25,18 +25,13 @@ RemoteSystemsTempFiles/
 # ---------------------------------------------------------------------------
 # Documentacao de fornecedor
 # ---------------------------------------------------------------------------
-# O user manual da Infineon nao vai para o repositorio: e material com
-# copyright de terceiros e tem ~17 MB. Baixar de infineon.com conforme
-# indicado no README.
-docs/*usermanual*.pdf
-docs/*datasheet*.pdf
-
-# Datasheets dos componentes da slave (copyright do fabricante; o do
-# HM2108NL e marcado "Pulse confidential & proprietary"). Citados no
-# relatorio pelo nome e revisao; baixar do site de cada fabricante.
-docs/HM2108NL.pdf
-docs/Bourns_08-20-2026_BTN06G.pdf
-docs/ds_cp_0678h_series.pdf
+# Manuais, datasheets e esquematicos de fabricante nao vao para o
+# repositorio: sao material com copyright de terceiros (alguns marcados
+# como confidenciais). O relatorio cita cada um pelo nome e revisao;
+# baixar do site de cada fabricante e colocar em docs/.
+# Unico PDF versionado: o proprio relatorio.
+docs/*.pdf
+!docs/relatorio_estrutura_software_bms.pdf
 
 # ---------------------------------------------------------------------------
 # Sistema operacional
