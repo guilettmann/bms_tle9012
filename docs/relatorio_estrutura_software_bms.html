@@ -154,17 +154,23 @@ falam direto com o STM32: conversam entre si e com o TLE9015 por <strong>iso UAR
 diferencial que atravessa a isolação por capacitor (dentro do módulo, entre CSCs vizinhas) ou por
 transformador (entre módulos). O STM32 só enxerga uma UART comum.</p>
 
-<div class="arq">  Master: STM32G491 --UART--> TLE9015
-                               |
-                          iso UART (transformador)
-                               |
-  Slave 1 (módulo 1) [CSC 1]--[CSC 2]--[CSC 3]--[CSC 4]     mesma placa: trilha, capacitivo
-                               |
-                          transformador
-                               |
-  Slave 2 (módulo 2) [CSC 5]--[CSC 6]--[CSC 7]--[CSC 8]
-                              ...
-  Slave 5 (módulo 5) [CSC 17]-[CSC 18]-[CSC 19]-[CSC 20]   (último nó da cadeia)</div>
+<div class="arq">  Master: STM32G491 --UART--> TLE9015 ------------------------+
+                                 | IFL                        | IFH
+                           transformador                transformador
+                                 |                            |
+  Slave 1   [CSC0]-[CSC1]-[CSC2]-[CSC3]                       |
+                                 |                            |
+                           transformador                      |
+                                 |                            |
+  Slave 2   [CSC0]-[CSC1]-[CSC2]-[CSC3]                       |
+                                ...                           |
+  Slave 5   [CSC0]-[CSC1]-[CSC2]-[CSC3] ----------------------+</div>
+<p>A cadeia é um <strong>anel</strong>: a saída da última slave volta para a segunda porta iso UART do TLE9015,
+que suporta esse modo <span class="cit">[DS15, p. 1 e 16]</span>. Com um fio partido em qualquer ponto, o master
+ainda chega a todos os nós, falando por um lado com os de baixo do corte e pelo outro com os de cima
+(PoB e PoT ao mesmo tempo) <span class="cit">[DS15, p. 16]</span>.</p>
+<p>Dentro de cada slave, numero as CSCs de 0 a 3, de baixo para cima, igual ao sufixo dos nets no esquemático. Na
+cadeia, os nós vão de 1 a 20, na ordem em que a mensagem passa saindo pela porta IFL do TLE9015.</p>
 
 <table>
 <thead><tr><td>Item</td><td>Valor</td><td>De onde vem</td></tr></thead>
@@ -645,7 +651,7 @@ feito é falha. O bootloader, por exemplo, tem nota 2.</p>
 </ul>
 
 <h3>13.3 Lista completa</h3>
-<p>104 requisitos: 67 de regra, 13 de segurança, 10 de desempenho e 14 de interface. Quando um requisito só repetia uma regra com outras palavras, juntei os dois.</p>
+<p>108 requisitos: 67 de regra, 17 de segurança, 10 de desempenho e 14 de interface. Quando um requisito só repetia uma regra com outras palavras, juntei os dois.</p>
 <table>
 <thead><tr><td>ID</td><td>Requisito</td><td>Origem</td><td>Referência</td><td>Imp.</td><td>Verificação</td></tr></thead>
 <tbody>
@@ -728,7 +734,11 @@ feito é falha. O bootloader, por exemplo, tem nota 2.</p>
   <tr><td class="id">R-76</td><td>Diagnóstico de corrente de balanceamento</td><td>Segurança</td><td>—</td><td class="num">3</td><td>Demonstração</td></tr>
   <tr><td class="id">R-77</td><td>Dissipação compatível com o container</td><td>Segurança</td><td>—</td><td class="num">4</td><td>Análise</td></tr>
   <tr><td class="id">R-78</td><td>Watchdog do TLE9012 realimentado</td><td>Segurança</td><td>Bancada</td><td class="num">4</td><td>Teste</td></tr>
-  <tr><td class="id">R-79</td><td>Topologia em anel — em aberto</td><td>Segurança</td><td>—</td><td class="num">3</td><td>Teste</td></tr>
+  <tr><td class="id">R-79</td><td>Topologia em anel: o master alcança todos os nós com um fio partido em qualquer ponto da cadeia</td><td>Segurança</td><td>—</td><td class="num">3</td><td>Teste</td></tr>
+  <tr><td class="id">R-103</td><td>Potência de balanceamento limitada por orçamento em watts por CSC</td><td>Segurança</td><td>D40</td><td class="num">5</td><td>Teste</td></tr>
+  <tr><td class="id">R-104</td><td>PWM de balanceamento reduzido pelo NTC de placa (75 a 90 °C, religa abaixo de 85 °C)</td><td>Segurança</td><td>D40</td><td class="num">4</td><td>Teste</td></tr>
+  <tr><td class="id">R-105</td><td>Balanceamento da CSC desligado se o NTC de placa falhar ou a leitura for inválida</td><td>Segurança</td><td>D40</td><td class="num">5</td><td>Demonstração</td></tr>
+  <tr><td class="id">R-106</td><td>Balanceamento da CSC desligado se um NTC de célula passar do limite</td><td>Segurança</td><td>D40</td><td class="num">5</td><td>Demonstração</td></tr>
   <tr><td class="id">R-80</td><td>Acumulador 140S3P em 5 módulos de 28S3P (420 células, 588 V)</td><td>Desempenho</td><td>—</td><td class="num">5</td><td>Análise</td></tr>
   <tr><td class="id">R-80b</td><td>Cobertura de temperatura de 38,1% das células: 16 NTCs de célula por módulo (TMP1 a TMP4), 80 no pack, 2 células por termistor; mais 1 NTC de placa por CSC (TMP0)</td><td>Desempenho</td><td>—</td><td class="num">4</td><td>Análise</td></tr>
   <tr><td class="id">R-81</td><td>Ciclo de leitura ≤ 100 ms</td><td>Desempenho</td><td>Objetivo 1</td><td class="num">4</td><td>Teste</td></tr>
@@ -762,6 +772,23 @@ feito é falha. O bootloader, por exemplo, tem nota 2.</p>
 <p>Cada slave tem 4 TLE9012, e cada um mede 7 grupos 3P. Chamo de <strong>T0 a T7</strong> os oito pontos de
 tomada de um TLE9012: T0 é o negativo do grupo de baixo, T7 é o positivo do grupo de cima. O T0 de uma CSC
 é o T7 da CSC de baixo.</p>
+
+<p>No esquemático, as tomadas usam a numeração do módulo, de T00 a T28, que é a mesma da placa de fusíveis. Cada CSC
+é uma cópia da mesma folha, só com os nomes trocados:</p>
+<table>
+<thead><tr><td></td><td>CSC0</td><td>CSC1</td><td>CSC2</td><td>CSC3</td></tr></thead>
+<tbody>
+  <tr><td>Tomadas</td><td>T00&ndash;T07</td><td>T07&ndash;T14</td><td>T14&ndash;T21</td><td>T21&ndash;T28</td></tr>
+  <tr><td>GND local (T0)</td><td>T00</td><td>T07</td><td>T14</td><td>T21</td></tr>
+  <tr><td>Sufixo dos nets locais</td><td>_0</td><td>_1</td><td>_2</td><td>_3</td></tr>
+  <tr><td>NTCs de célula</td><td>NTC1&ndash;4</td><td>NTC5&ndash;8</td><td>NTC9&ndash;12</td><td>NTC13&ndash;16</td></tr>
+  <tr><td>NTC de placa</td><td>NTC_PCB_0</td><td>NTC_PCB_1</td><td>NTC_PCB_2</td><td>NTC_PCB_3</td></tr>
+  <tr><td>iso UART, entrada (IFL)</td><td>ISO_IN</td><td>ISO01</td><td>ISO12</td><td>ISO23</td></tr>
+  <tr><td>iso UART, saída (IFH)</td><td>ISO01</td><td>ISO12</td><td>ISO23</td><td>WIRE_OUT</td></tr>
+</tbody>
+</table>
+<p>Os únicos nets que duas CSCs dividem são as tomadas da fronteira (T07, T14, T21) e a iso UART entre elas
+(ISO01, ISO12, ISO23). O GND de cada CSC é a tomada de baixo dela, nunca um símbolo de GND comum.</p>
 
 <p>Tirei a ligação de três fontes, que concordam entre si: o esquemático de aplicação do manual
 <span class="cit">[UM, Fig. 18 e Tab. 1&ndash;4, p. 19&ndash;24]</span>, o esquemático da placa de avaliação que usei na
@@ -875,12 +902,55 @@ TLE9012 balanceia, ele puxa o Gn para o Un, e o PMOS liga com o gate uma tensão
       para o epóxi, então a isolação precisa vir da capa da célula ou de uma camada extra, documentada.</li>
 </ul>
 
+<h3>Controle térmico do balanceamento</h3>
+<p>O hardware define o máximo: com o PMOS ligado, cada grupo puxa ~0,44 A e dissipa ~1,7 W no R_BAL (simulado no
+LTspice). Com os 7 grupos de uma CSC ligados seriam ~12 W, e com a slave inteira ~48 W, o que um container fechado a
+50 °C não aguenta. Quem decide quanto usar é o firmware, com três controles do próprio TLE9012:</p>
+<ul>
+  <li><strong>Quais grupos:</strong> BAL_SETTINGS, um bit por célula <span class="cit">[UM, seç. 4.21, p. 87]</span>.</li>
+  <li><strong>Quanto tempo ligado:</strong> BAL_PWM, de 100% a 12,5% em passos de 12,5%, com período igual ao round
+      robin <span class="cit">[UM, seç. 4.51, p. 120; DS12, PRQ-1363, p. 45]</span>. É um só por TLE9012, então vale para
+      todos os grupos daquela CSC.</li>
+  <li><strong>Por quanto tempo:</strong> o firmware desliga cada grupo ao atingir o alvo e reveza os grupos quando o
+      orçamento não deixa ligar todos.</li>
+</ul>
+<p>Cada CSC tem um NTC de placa (TMP0) e um BAL_PWM, então cada uma controla a própria temperatura. A cada ciclo:</p>
+<div class="arq">ciclo = mínimo( ciclo pelo orçamento de potência da CSC ,
+               ciclo pela temperatura da placa (TMP0) )
+
+orçamento:   n_grupos_ligados × V_célula² / R_BAL × ciclo  ≤  W da CSC
+
+placa ≤ 75 °C          → até 100%
+placa 75 a 90 °C       → cai linearmente até 12,5%
+placa ≥ 90 °C          → 0%   (religa abaixo de 85 °C)</div>
+<p>O orçamento evita o pico, porque o NTC demora segundos para perceber o aquecimento; o NTC corrige o acumulado. Os
+limites de 75 e 90 °C e o orçamento por CSC são valores iniciais meus e saem do ensaio térmico com a slave no container
+fechado. Pela minha estimativa, balancear com 20 a 40 W no pack inteiro (1 a 2 W por CSC) aquece o acumulador na mesma
+ordem que as perdas da própria carga, enquanto 80 W ou mais consomem a folga entre 50 °C de ambiente e 60 °C de
+limite das células.</p>
+<div class="regra">
+  <div class="rot">Regras de segurança do controle</div>
+  <ul>
+    <li>NTC de placa aberto, em curto ou com leitura inválida ou velha: balanceamento da CSC em 0%.</li>
+    <li>Qualquer NTC de célula da CSC (TMP1 a TMP4) acima do limite de célula: balanceamento da CSC em 0%, com
+        prioridade sobre a temperatura da placa.</li>
+    <li>Shutdown aberto: balanceamento desligado em todo o pack <span class="cit">[FSAE, EV.8.3.3, p. 107]</span>.</li>
+    <li>Reforço em hardware: o TLE9012 desliga o balanceamento sozinho por sobretemperatura interna
+        <span class="cit">[UM, GEN_DIAG.INT_OT, p. 75]</span>, mesmo com o firmware travado.</li>
+  </ul>
+</div>
+<p>No layout, o NTC de placa fica no meio dos R_BAL, sobre o mesmo cobre, para medir os resistores e não o ar.</p>
+
 <h3>Comunicação dentro da slave</h3>
-<p>Entrada da slave &rarr; IFL da CSC 1 &rarr; IFH da CSC 1 &rarr; IFL da CSC 2 &rarr; &hellip; &rarr; IFH da CSC 4 &rarr;
+<p>Entrada da slave &rarr; IFL da CSC0 &rarr; IFH da CSC0 &rarr; IFL da CSC1 &rarr; &hellip; &rarr; IFH da CSC3 &rarr;
 saída da slave. Cada lado de cada CI tem a sua rede de 39 Ω e 1 nF. Entre CSCs da mesma placa a diferença
 de tensão é de uns 29,4 V, e o manual diz que 100 V bastam para o capacitor em série quando o sistema não
-pede mais <span class="cit">[UM, Tab. 2, p. 22]</span>. A terminação de 100 Ω com 250 pF só vai no último nó da
-cadeia, a CSC 20, e é opcional <span class="cit">[UM, Tab. 4, p. 24]</span>.</p>
+pede mais <span class="cit">[UM, Tab. 2, p. 22]</span>. A terminação de 100 Ω com 250 pF é para o fim de uma cadeia
+em linha <span class="cit">[UM, Tab. 4, p. 24]</span>; no anel não há ponta solta, porque a saída da slave 5 volta ao
+master, então ela não entra na slave.</p>
+<p>A entrada e a saída da slave usam o mesmo conector, um Micro-Fit 3.0 1x2 (WIRE_IN e WIRE_OUT). Como o
+transformador fica só na entrada, inverter os dois plugues numa slave deixaria uma ligação entre módulos sem
+transformador, só com os 1 nF de 100 V; por isso a serigrafia e o chicote marcam IN e OUT.</p>
 
 <h3>Transformador entre módulos e no master</h3>
 <div class="decisao">
@@ -888,7 +958,7 @@ cadeia, a CSC 20, e é opcional <span class="cit">[UM, Tab. 4, p. 24]</span>.</p
   <div class="peca">Pulse HM2108NL</div>
   <p>Transformador 1:1 com filtro de modo comum embutido, <strong>1000 VDC de tensão de trabalho por 15 anos</strong>,
   4300 VDC de teste por 60 s, isolação básica (IEC 60664 / ISO 6469), creepage interno maior que 11 mm, AEC-Q200,
-  de &minus;40 a 125 °C <span class="cit">[TRAFO, folha 2]</span>. Um na entrada de cada slave e um no master: 6 no pack.</p>
+  de &minus;40 a 125 °C <span class="cit">[TRAFO, folha 2]</span>. Um na entrada de cada slave e dois no master, um em cada porta do anel: 7 no pack.</p>
 </div>
 <p>A ligação segue o esquemático da Infineon com transformador <span class="cit">[UM, Fig. 24, p. 29]</span>: em cada
 linha, 39 Ω, 220 pF opcional ao GND local e 1 nF em série; os dois 1 nF entram no enrolamento do lado do CI, e cada
@@ -909,6 +979,53 @@ de 100 V <span class="cit">[UM, Tab. 5, p. 30]</span>. O lado do filtro de modo 
   </ul>
 </div>
 
+<h3>Layout da slave</h3>
+<p>Passei o projeto do Altium para o KiCad 10 (pasta <code>bms-amp-227</code>) e fiz a primeira versão do
+posicionamento. A placa tem <strong>155 &times; 65 mm, 4 camadas e 1,6 mm</strong>, com quatro furos M3 nos cantos e
+3 mm sem cobre em volta de cada um. As quatro CSCs ficam lado a lado, uma coluna de 32,5 mm para cada, na mesma
+ordem do módulo (CSC0 à esquerda).</p>
+<table>
+<thead><tr><td>Lado</td><td>O que fica, de cima para baixo em cada coluna</td></tr></thead>
+<tbody>
+  <tr><td>Cima</td><td>Rótulo CSCx e LED; TLE9012 girado 180° (pinos de célula para baixo); fila de C_F e C_FB colados
+      nesses pinos; fila de R_F; fila de PMOS; R_BAL em pé, o par de cada grupo na coluna do seu PMOS, com o NTC de
+      placa entre as duas fileiras; conectores de tensão e de NTC na borda de baixo</td></tr>
+  <tr><td>Baixo</td><td>Filtros dos NTCs (um canal por coluna) e pull-downs à direita do CI; iso UART (uma linha por
+      coluna: 39 Ω, 220 pF, 1 nF) e desacoplamento de VDDC, VREGOUT e VS à esquerda; filtros de VS e U12P logo
+      abaixo; R_B embaixo de cada PMOS. Embaixo do pad exposto e dos R_BAL não vai componente: esse cobre é para o
+      calor</td></tr>
+</tbody>
+</table>
+<p>A ordem segue o caminho do sinal: conector &rarr; R_BAL e PMOS &rarr; R_F &rarr; C_F &rarr; pino. Os R_BAL ficam
+longe do CI e o dreno de cada PMOS desce reto para o seu par. A entrada da iso UART (J6 e o transformador) fica na
+borda esquerda e a saída (J7) na direita. Os designadores ficam na camada de montagem (Fab) e a serigrafia leva só
+rótulos: CSC0 a CSC3, IN, OUT e o conteúdo de cada conector.</p>
+<p>As regras de projeto estão no arquivo <code>bms-amp-227.kicad_dru</code>:</p>
+<table>
+<thead><tr><td>Regra</td><td>Valor</td><td>Por quê</td></tr></thead>
+<tbody>
+  <tr><td>Entre pinos do TLE9012</td><td>0,2 mm</td><td>Passo de 0,5 mm do CI</td></tr>
+  <tr><td>Entre CSCs não vizinhas</td><td>0,6 mm</td><td>Até 88,2 V entre elas; IPC-2221B, Tab. 6-1, B2, 31 a 100 V
+      (valor de memória, a conferir na norma)</td></tr>
+  <tr><td>Lado do cabo da iso UART (WIRE_IN) até o resto</td><td>4,0 mm de isolamento e de creepage</td><td>Barreira
+      galvânica, abaixo</td></tr>
+  <tr><td>Trilhas de balanceamento (tomadas e dreno)</td><td>mínimo 0,4 mm</td><td>~0,44 A</td></tr>
+</tbody>
+</table>
+
+<div class="decisao">
+  <div class="rot">Decisão</div>
+  <div class="peca">Barreira galvânica de 4,0 mm e verniz na slave</div>
+  <p>O transformador separa o lado do cabo, que fica no potencial do módulo vizinho, do resto da placa. Marquei essa
+  separação na serigrafia (linha tracejada, cota e o texto "BARREIRA GALV. &ge; 4,0 mm (EV.7.5.7)") e criei uma área
+  de regra em todas as camadas de cobre, onde não passa trilha, via nem plano.</p>
+  <p>A tabela da EV.7.5.7 é para TS e GLV na mesma placa <span class="cit">[FSAE, EV.7.5.7, p. 104]</span>; aqui os dois
+  lados são TS, de módulos diferentes. Usei a linha mais exigente, de 300 a 600 V, porque numa falha de isolação o cabo
+  pode chegar à tensão do pack. Ela pede 20 mm de creepage sem verniz e 4,0 mm com verniz. O próprio transformador
+  deixa 13,7 mm entre os pads dos dois lados <span class="cit">[TRAFO, folha 3]</span>, então os 20 mm não cabem:
+  <strong>a slave leva verniz isolante</strong>, e com ele valem os 4,0 mm.</p>
+</div>
+
 <h3>Fusíveis de sensoriamento</h3>
 <div class="decisao">
   <div class="rot">Decisão</div>
@@ -920,7 +1037,7 @@ de 100 V <span class="cit">[UM, Tab. 5, p. 30]</span>. O lado do filtro de modo 
 
 <p><strong>Onde fica.</strong> Em cada tomada, logo depois da célula e antes de qualquer outra ligação (PMOS, R_BAL,
 R_F), no condutor ligado direto à aba <span class="cit">[FSAE, EV.8.4.3a, p. 107]</span>. Fica junto às abas, e não
-na slave. As tomadas compartilhadas entre CSCs (TAP07, TAP14, TAP21) usam um fio e um fusível só.</p>
+na slave. As tomadas compartilhadas entre CSCs (T07, T14, T21) usam um fio e um fusível só.</p>
 
 <p><strong>Por que esse.</strong> Três exigências fecharam a escolha:</p>
 <ul>
@@ -939,6 +1056,49 @@ na slave. As tomadas compartilhadas entre CSCs (TAP07, TAP14, TAP21) usam um fio
 <p>O fusível só precisa aguentar a tensão do módulo porque os fios de módulos diferentes nunca se encontram: cada
 módulo tem o seu chicote, separado dos outros.</p>
 
+<p>Os fusíveis ficam numa placa separada, presa junto ao barramento. Os 29 fios chegam do barramento por parafuso e
+são soldados na placa (pads de 2,54 mm); antes do fusível o net se chama CEL00 a CEL28 (sem proteção) e depois,
+T00 a T28, o mesmo nome da slave. Cada coluna tem o pad de entrada, o fusível e o pad de saída, num passo de 5,08 mm,
+e a placa toda cabe em 155 &times; 67 mm. Vizinhos diferem de um grupo (até 4,2 V), então a tabela de espaçamento
+da EV.7.5.7 não se aplica (ela é para TS e GLV na mesma placa) <span class="cit">[FSAE, EV.7.5.7, p. 104]</span>;
+mesmo assim a placa leva verniz, e com verniz até 50 V a tabela pede 1,0 mm, que os vãos atendem. Placa e fios
+ficam a 30 mm de qualquer parte GLV no container, ou separados por barreira isolante
+<span class="cit">[FSAE, EV.7.5.5, p. 103]</span>.</p>
+
+<h3>LED de comunicação</h3>
+<p>Cada CSC tem um LED que mostra se ela está conversando com o master. O LED fica no pino PWM0 (21), usado como saída
+digital pelo registrador GPIO (bits DIR_PWM0 e OUT_PWM0) <span class="cit">[UM, seç. 4.42, p. 110&ndash;111]</span>:
+PWM0 &rarr; 680 Ω &rarr; LED &rarr; GND local, com o pull-down de 33 kΩ que já existia segurando o LED apagado
+com o CI dormindo. A saída vem do VIO, ligado ao VREGOUT (3,45 V típ.) <span class="cit">[DS12, PRQ-544, p. 16]</span>,
+o que dá uns 2,3 mA num LED verde (cálculo meu), abaixo dos 5 mA do pino
+<span class="cit">[DS12, PRQ-829, p. 49]</span>.</p>
+<p>O firmware pisca o LED de cada CSC a ~1 Hz, mas só depois de receber dela uma resposta com CRC certo. Piscando quer
+dizer comunicação nos dois sentidos. Se a comunicação cai, o LED para; depois de ~2 s sem comando o watchdog põe o CI
+para dormir e o LED apaga <span class="cit">[DS12, tWD_max, p. 22]</span>. O LED só é visível com o acumulador aberto;
+no carro fechado, o estado vai pela CAN.</p>
+
+<h3>Conectores da slave</h3>
+<p>Uso Micro-Fit 3.0 em todos, com um tamanho diferente para cada função. Assim nenhum plugue encaixa no lugar de
+outro: um plugue de tensão no conector de NTC poria tensão de célula nas entradas TMP do CI.</p>
+<table>
+<thead><tr><td>Conector</td><td>Tamanho</td><td>Sinais</td></tr></thead>
+<tbody>
+  <tr><td>Tensão A</td><td>2x9</td><td>T00 a T14 em sequência (CSC0 e CSC1); pinos 10 a 12 vazios</td></tr>
+  <tr><td>Tensão B</td><td>2x7</td><td>T15 a T28 em sequência (CSC2 e CSC3)</td></tr>
+  <tr><td>NTC A</td><td>2x8</td><td>NTC1 a NTC8 nos pinos 1 a 8; retornos na frente de cada um: T00 (CSC0) nos pinos 13 a 16 e T07 (CSC1) nos pinos 9 a 12</td></tr>
+  <tr><td>NTC B</td><td>2x8</td><td>NTC9 a NTC16; retornos em T14 (CSC2) e T21 (CSC3), na mesma ordem</td></tr>
+</tbody>
+</table>
+<p>Na numeração do Micro-Fit, o pino 1 fica na frente do último, então cada NTC tem o retorno no pino da frente e
+os dois fios do termistor ficam lado a lado no plugue. Nos conectores de tensão, pinos frente a frente diferem de 9
+grupos no 2x9 (~38 V) e de 7 no 2x7 (~29 V); o chicote em sequência é mais fácil de montar.</p>
+<div class="aviso">
+  <div class="rot">Ordem de montagem</div>
+  <p>O T14, GND da CSC2, está só no conector A, e as outras tomadas da CSC2 estão no B. Com o B ligado e o A solto, a
+  CSC2 fica com as células ligadas e o GND aberto. Por isso: <strong>ligar o A antes do B, e desligar o B antes do
+  A</strong>.</p>
+</div>
+
 <!-- ===================================================== 14 -->
 <h2 id="s14">15. Próximos passos</h2>
 
@@ -948,7 +1108,8 @@ módulo tem o seu chicote, separado dos outros.</p>
       transformar as leituras em tabelas por nó. Cada CSC terá 7 grupos nos canais 5 a 11, então o
       <code>PART_CONFIG</code> passa de <code>0x0FFF</code> para <code>0x0FE0</code> e o firmware ignora os canais
       0 a 4, que leriam 0 V e disparariam subtensão (seção 14).</li>
-  <li><strong>Balanceamento</strong>, desligado durante a medição e proibido com o shutdown aberto
+  <li><strong>Balanceamento</strong>, com o controle térmico da seção 14 (orçamento por CSC e NTC de placa), desligado
+      durante a medição e proibido com o shutdown aberto
       <span class="cit">[FSAE, EV.8.3.3, p. 107]</span>.</li>
   <li><strong>Luz BMS com lamp check</strong> <span class="cit">[FSAE, EV.8.3.6, p. 107; EV.6.3.2, p. 101]</span>,
       <strong>sinal para o TSSI</strong> piscar de 2,5 a 5 Hz <span class="cit">[FSAE, EV.6.1.7, p. 100]</span>,
@@ -991,7 +1152,6 @@ e decide no reset se atualiza ou pula para a aplicação.</p>
   <tr><td>Célula do acumulador (a placa de pré-carga usa a Molicel P28A; falta confirmar para o BMS)</td><td>Limiares de tensão e temperatura, massa do módulo, dissipação do balanceamento</td></tr>
   <tr><td>Limiar final de sobretemperatura</td><td>Exatidão do conjunto NTC + CI</td></tr>
   <tr><td>Aceitação do NTC no corpo da célula na inspeção</td><td>EV.8.5.3 e EV.8.5.4; uma Rules Question (GR.7) deixaria a aceitação por escrito</td></tr>
-  <tr><td>Topologia em anel</td><td>Tolerância a um fio partido na cadeia</td></tr>
   <tr><td>Placa master própria</td><td>Entradas e saídas de segurança, alimentação do TLE9015</td></tr>
   <tr><td>Tempo máximo de reação a falhas</td><td>O regulamento não fixa valor</td></tr>
 </tbody>
@@ -1041,7 +1201,14 @@ e decide no reset se atualiza ou pula para a aplicação.</p>
   <tr><td class="id">D36</td><td>R_B = 10 kΩ e C_FB = 1 nF no balanceamento externo; um R_F por tomada (8 por CSC)</td><td>τ de 10 µs: o PMOS desliga antes da medição; com 100 nF levaria ~1,5 ms (cálculo meu)</td><td>nov/2026</td></tr>
   <tr><td class="id">D37</td><td>Por CSC: 1 NTC de placa (TMP0) no meio dos R_BAL e 4 NTCs de célula (TMP1&ndash;TMP4); 80 de célula e 20 de placa no pack</td><td>O calor do balanceamento externo fica fora do CI; a cobertura das células cai para 38,1%, ainda acima da meta de 30%</td><td>nov/2026</td></tr>
   <tr><td class="id">D38</td><td>NTC de placa: Bourns BTN06G103H3HF1T0A (10 kΩ ±3%, B 3380 K), 1 por CSC, 20 no pack</td><td>Só controla o balanceamento pela temperatura da placa; ±1 °C basta <span class="cit">[NTC2, p. 1&ndash;2]</span></td><td>nov/2026</td></tr>
-  <tr><td class="id">D39</td><td>Transformador da iso UART: Pulse HM2108NL, 1 por slave e 1 no master (6 no pack); R_N inicial de 1 kΩ</td><td>1000 VDC de trabalho cobre os 588 V do pack; AEC-Q200; filtro de modo comum embutido <span class="cit">[TRAFO, folha 2]</span></td><td>nov/2026</td></tr>
+  <tr><td class="id">D39</td><td>Transformador da iso UART: Pulse HM2108NL, 1 por slave e 2 no master (7 no pack, com o anel); R_N inicial de 1 kΩ</td><td>1000 VDC de trabalho cobre os 588 V do pack; AEC-Q200; filtro de modo comum embutido <span class="cit">[TRAFO, folha 2]</span></td><td>nov/2026</td></tr>
+  <tr><td class="id">D40</td><td>Controle térmico do balanceamento por CSC: orçamento de potência e PWM reduzido pelo NTC de placa (75 a 90 °C); 0% se o NTC falhar ou uma célula passar do limite</td><td>A corrente de 500 mA é o máximo; o firmware decide quanto usar para não aquecer o container fechado</td><td>nov/2026</td></tr>
+  <tr><td class="id">D41</td><td>CSCs numeradas de 0 a 3 dentro da slave; tomadas T00&ndash;T28 no esquemático, sufixo _0 a _3 nos nets locais, NTC1&ndash;16, NTC_PCB_0&ndash;3, iso UART ISO_IN, ISO01, ISO12, ISO23, WIRE_OUT</td><td>Número da CSC igual ao sufixo dos nets; tomadas com o mesmo nome da placa de fusíveis</td><td>nov/2026</td></tr>
+  <tr><td class="id">D42</td><td>Conectores Micro-Fit 3.0 na slave: tensão em 2x9 (T00&ndash;T14) e 2x7 (T15&ndash;T28), NTCs em dois 2x8 com o retorno de cada NTC no pino da frente; ligar o conector A antes do B</td><td>Tamanhos diferentes impedem trocar os plugues; T14 só no A para não acrescentar fio, com ordem de montagem definida</td><td>nov/2026</td></tr>
+  <tr><td class="id">D43</td><td>iso UART em anel: a saída da slave 5 volta à segunda porta do TLE9015, com transformador no master (2 no master, 7 no pack); entrada e saída da slave em Micro-Fit 1x2 iguais, marcados IN/OUT; sem terminação na slave</td><td>Comunicação continua com um fio partido <span class="cit">[DS15, p. 16]</span></td><td>nov/2026</td></tr>
+  <tr><td class="id">D44</td><td>LED de comunicação por CSC no PWM0 (680 Ω, ~2,3 mA), piscando só com resposta válida daquela CSC</td><td>Mostra em bancada em que ponto a cadeia parou, sem CI a mais</td><td>nov/2026</td></tr>
+  <tr><td class="id">D45</td><td>Layout da slave no KiCad 10: 155 &times; 65 mm, 4 camadas, 1,6 mm; uma coluna por CSC; potência (CI, PMOS, R_BAL em pé, NTC de placa) em cima e passivos pequenos embaixo; nada sob o pad exposto e sob os R_BAL</td><td>Caminho do sinal em linha reta e calor longe do CI; peças nos dois lados para caber na placa</td><td>nov/2026</td></tr>
+  <tr><td class="id">D46</td><td>Barreira galvânica de 4,0 mm no lado do cabo do transformador, marcada na serigrafia e como área de regra; slave com verniz isolante</td><td>EV.7.5.7, 300 a 600 V: 4,0 mm com verniz; sem verniz seriam 20 mm e o transformador só tem 13,7 mm <span class="cit">[FSAE, EV.7.5.7, p. 104; TRAFO, folha 3]</span></td><td>nov/2026</td></tr>
 </tbody>
 </table>
 
@@ -1053,7 +1220,7 @@ e decide no reset se atualiza ou pula para a aplicação.</p>
 <tbody>
   <tr><td class="sim">Confirmado em documento</td><td>Faixas de alimentação, velocidade da UART, desativação da UART pelo <code>VIO</code>, formato das mensagens, CRC8, watchdog, reset de registradores, registradores de multiread, fórmulas de tensão e de temperatura, tipos dos registradores de falha e itens do regulamento &mdash; todos citados no texto com página.</td></tr>
   <tr><td class="sim">Confirmado em bancada</td><td>2 Mbit/s e MSB primeiro funcionando; CRC8 e CRC3; formato de 64 bytes do multiread; 12 &times; 1056 mV com 12,67 V; necessidade do <code>VIO</code>; ligação cruzada; armadilha do <code>I_NTC</code>; resistores de 5,1 kΩ por jumper nos canais de NTC da placa de avaliação, confirmados no esquemático.</td></tr>
-  <tr><td class="talvez">Cálculo meu</td><td>117,6 V por módulo e 588 V no pack; 16 termistores de célula por módulo e 38,1%; atualização dos 5 NTCs de uma CSC em ~300 ms; 57,1% no arranjo em triângulo (distância de ~10,7 mm); limiares de temperatura em unidades do CI (60 °C &rarr; 292, 55 °C &rarr; 327); fator inteiro 25000/4096; tempo de byte de 5 µs; <code>PART_CONFIG = 0x0FE0</code>; R_BAL de ~8,2 Ω e ~2 W por grupo para 500 mA; corrente de curto dos fios de sensoriamento ~630 A; limiares do NTC Eaton (60 °C &rarr; 423, 55 °C &rarr; 503).</td></tr>
+  <tr><td class="talvez">Cálculo meu</td><td>117,6 V por módulo e 588 V no pack; 16 termistores de célula por módulo e 38,1%; atualização dos 5 NTCs de uma CSC em ~300 ms; 57,1% no arranjo em triângulo (distância de ~10,7 mm); limiares de temperatura em unidades do CI (60 °C &rarr; 292, 55 °C &rarr; 327); fator inteiro 25000/4096; tempo de byte de 5 µs; <code>PART_CONFIG = 0x0FE0</code>; R_BAL de ~8,2 Ω e ~2 W por grupo para 500 mA; estimativa de aquecimento do container (~2,6 W/K, ~19 kJ/K) e limites de 75 e 90 °C da placa; corrente de curto dos fios de sensoriamento ~630 A; limiares do NTC Eaton (60 °C &rarr; 423, 55 °C &rarr; 503).</td></tr>
   <tr><td class="nao">Não verificado</td><td>Ordem das células no multiread; curva do MF52A usado na bancada (B = 3950 assumido); equivalência G491/G474 e recurso <em>MSB First</em> do USART (documentação da ST não está na pasta do projeto, embora o MSB primeiro funcione em bancada); CRC3, que vem da biblioteca de referência e não do manual; eventuais adendos da FSAE Brasil; tensão nominal do fusível 0437.500WRA da placa de avaliação; valor final do R_B e do R_BAL (propostos, não ensaiados); tensão de isolação do epóxi do NTC (o datasheet não especifica); valor final do R_N do HM2108NL.</td></tr>
 </tbody>
 </table>
