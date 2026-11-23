@@ -1026,6 +1026,30 @@ rótulos: CSC0 a CSC3, IN, OUT e o conteúdo de cada conector.</p>
   <strong>a slave leva verniz isolante</strong>, e com ele valem os 4,0 mm.</p>
 </div>
 
+<h3>Roteamento da slave</h3>
+<p>Roteei com o Freerouting 2.5.0 nas quatro camadas e completei à mão, por script, o que ele deixou aberto. O que
+fez o roteamento fechar foi dar a ele as regras certas desde o início:</p>
+<ul>
+  <li><strong>Isolamento pela diferença de tensão real.</strong> Duas tomadas T<sub>i</sub> e T<sub>j</sub> ficam a
+      |i &minus; j| &times; 4,2 V. Acima de 30 V a distância mínima é 0,6 mm nas camadas de fora (IPC-2221B,
+      Tab. 6-1, B2, 31 a 100 V); nas internas vale 0,2 mm (coluna B1). As nets locais de cada CSC contam como a faixa
+      de tomadas dela. Os valores da IPC são de memória, a conferir na norma.</li>
+  <li><strong>Áreas sem trilha e sem via embaixo dos R_BAL</strong> na In1 e no bottom, para o cobre de GND ficar
+      inteiro onde o calor precisa espalhar.</li>
+  <li><strong>GND de cada CSC como preenchimento</strong> na In1, na In2 e no bottom, uma ilha por coluna, com vias
+      de costura entre as colunas de R_BAL ligando as três camadas.</li>
+  <li><strong>Trilhas:</strong> 0,2 mm no geral, 0,4 mm nas tomadas e no dreno (estreitando para até 0,25 mm na
+      chegada dos pads), 0,25 mm no GND; via de 0,6/0,3 mm (0,8/0,4 no balanceamento). Perto dos pinos do TLE9012
+      há trechos curtos de 0,1 mm; o mínimo da placa ficou em 0,1 mm e o cobre até a borda em 0,25 mm.</li>
+</ul>
+<div class="aviso">
+  <div class="rot">Falta fechar</div>
+  <p>Duas ligações ficaram sem rota: o PWM1 da CSC0 (pino 20 até o pull-down no bottom) e o NTC9 no filtro da CSC2.
+  As duas estão presas pela ordem dos pads nos blocos de 0805 do bottom: no filtro dos NTCs o 100 Ω está com o pad
+  do TMP virado para o 4,7 nF, e a ligação tem de contornar o pad do outro net. Girar o 100 Ω de cada canal em 180°
+  resolve; o mesmo vale para os R_F, que estão com o pad da tomada virado para o CI.</p>
+</div>
+
 <h3>Fusíveis de sensoriamento</h3>
 <div class="decisao">
   <div class="rot">Decisão</div>
@@ -1209,6 +1233,7 @@ e decide no reset se atualiza ou pula para a aplicação.</p>
   <tr><td class="id">D44</td><td>LED de comunicação por CSC no PWM0 (680 Ω, ~2,3 mA), piscando só com resposta válida daquela CSC</td><td>Mostra em bancada em que ponto a cadeia parou, sem CI a mais</td><td>nov/2026</td></tr>
   <tr><td class="id">D45</td><td>Layout da slave no KiCad 10: 155 &times; 65 mm, 4 camadas, 1,6 mm; uma coluna por CSC; potência (CI, PMOS, R_BAL em pé, NTC de placa) em cima e passivos pequenos embaixo; nada sob o pad exposto e sob os R_BAL</td><td>Caminho do sinal em linha reta e calor longe do CI; peças nos dois lados para caber na placa</td><td>nov/2026</td></tr>
   <tr><td class="id">D46</td><td>Barreira galvânica de 4,0 mm no lado do cabo do transformador, marcada na serigrafia e como área de regra; slave com verniz isolante</td><td>EV.7.5.7, 300 a 600 V: 4,0 mm com verniz; sem verniz seriam 20 mm e o transformador só tem 13,7 mm <span class="cit">[FSAE, EV.7.5.7, p. 104; TRAFO, folha 3]</span></td><td>nov/2026</td></tr>
+  <tr><td class="id">D47</td><td>Roteamento em 4 camadas com isolamento pela diferença de tensão real: 0,6 mm acima de 30 V nas camadas externas, 0,2 mm nas internas; GND de cada CSC como preenchimento em In1, In2 e bottom, com áreas sem trilha embaixo dos R_BAL</td><td>Regra por CSC dava falso positivo e travava o roteador; IPC-2221B, Tab. 6-1, B1 e B2</td><td>nov/2026</td></tr>
 </tbody>
 </table>
 
