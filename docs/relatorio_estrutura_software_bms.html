@@ -1044,10 +1044,11 @@ fez o roteamento fechar foi dar a ele as regras certas desde o início:</p>
 </ul>
 <div class="aviso">
   <div class="rot">Falta fechar</div>
-  <p>Duas ligações ficaram sem rota: o PWM1 da CSC0 (pino 20 até o pull-down no bottom) e o NTC9 no filtro da CSC2.
-  As duas estão presas pela ordem dos pads nos blocos de 0805 do bottom: no filtro dos NTCs o 100 Ω está com o pad
-  do TMP virado para o 4,7 nF, e a ligação tem de contornar o pad do outro net. Girar o 100 Ω de cada canal em 180°
-  resolve; o mesmo vale para os R_F, que estão com o pad da tomada virado para o CI.</p>
+  <p>Na disposição final (NTC saindo pela direita, Micro-Fit de tensão centralizados embaixo, IN e OUT na esquerda
+  simétricos ao transformador) ficaram três ligações abertas, todas curtas: o pino 22 (GND) do TLE9012 da CSC2 até o
+  plano, o 100 nF do VS da CSC3 (C117, embaixo) até o pino 34, e o NTC14 do J4 até o filtro. O resto passa no DRC sem
+  violação elétrica. Para abrir caminho para os NTCs que sobem do J4, a In1 ganhou um corredor de 5 mm na ponta
+  direita da faixa dos R_BAL da CSC3; embaixo dos R_BAL a via é permitida e a trilha não.</p>
 </div>
 
 <h3>Fusíveis de sensoriamento</h3>
