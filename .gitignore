@@ -34,6 +34,15 @@ docs/*.pdf
 !docs/relatorio_estrutura_software_bms.pdf
 
 # ---------------------------------------------------------------------------
+# KiCad: historico local, travas, backups e preferencias de quem abriu
+# ---------------------------------------------------------------------------
+**/.history/
+*.lck
+*-backups/
+fp-info-cache
+*.kicad_prl
+
+# ---------------------------------------------------------------------------
 # Sistema operacional
 # ---------------------------------------------------------------------------
 Thumbs.db

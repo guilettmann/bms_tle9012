@@ -1,0 +1,37 @@
+(version 1)
+
+# Regras da slave do BMS AMP 227 (4 x TLE9012, 28S).
+# Dominios por CSC: CSC0 = T00..T07 e nets _0; CSC1 = T07..T14 e _1;
+# CSC2 = T14..T21 e _2; CSC3 = T21..T28 e _3.
+# CSCs vizinhas ficam a ate 29,4 V (7 x 4,2 V): o isolamento padrao basta.
+# CSCs nao vizinhas chegam a 58,8 V (CSC0-CSC2, CSC1-CSC3) e 88,2 V (CSC0-CSC3):
+# IPC-2221B, Tab. 6-1, B2 (externo, sem verniz), 31-100 V -> 0,6 mm.
+
+# Passo de 0,5 mm do TLE9012 (pads de 0,29 mm deixam 0,21 mm entre pinos)
+(rule "fanout TLE9012"
+    (constraint clearance (min 0.2mm))
+    (condition "A.memberOfFootprint('U?') && B.memberOfFootprint('U?')"))
+
+(rule "CSC0 x CSC2"
+    (constraint clearance (min 0.6mm))
+    (condition "((A.NetName == '*_0' && A.NetName != 'Net*') || A.NetName == 'T00' || A.NetName == 'T01' || A.NetName == 'T02' || A.NetName == 'T03' || A.NetName == 'T04' || A.NetName == 'T05' || A.NetName == 'T06' || A.NetName == 'T07') && ((B.NetName == '*_2' && B.NetName != 'Net*') || B.NetName == 'T14' || B.NetName == 'T15' || B.NetName == 'T16' || B.NetName == 'T17' || B.NetName == 'T18' || B.NetName == 'T19' || B.NetName == 'T20' || B.NetName == 'T21')"))
+
+(rule "CSC0 x CSC3"
+    (constraint clearance (min 0.6mm))
+    (condition "((A.NetName == '*_0' && A.NetName != 'Net*') || A.NetName == 'T00' || A.NetName == 'T01' || A.NetName == 'T02' || A.NetName == 'T03' || A.NetName == 'T04' || A.NetName == 'T05' || A.NetName == 'T06' || A.NetName == 'T07') && ((B.NetName == '*_3' && B.NetName != 'Net*') || B.NetName == 'T21' || B.NetName == 'T22' || B.NetName == 'T23' || B.NetName == 'T24' || B.NetName == 'T25' || B.NetName == 'T26' || B.NetName == 'T27' || B.NetName == 'T28')"))
+
+(rule "CSC1 x CSC3"
+    (constraint clearance (min 0.6mm))
+    (condition "((A.NetName == '*_1' && A.NetName != 'Net*') || A.NetName == 'T07' || A.NetName == 'T08' || A.NetName == 'T09' || A.NetName == 'T10' || A.NetName == 'T11' || A.NetName == 'T12' || A.NetName == 'T13' || A.NetName == 'T14') && ((B.NetName == '*_3' && B.NetName != 'Net*') || B.NetName == 'T21' || B.NetName == 'T22' || B.NetName == 'T23' || B.NetName == 'T24' || B.NetName == 'T25' || B.NetName == 'T26' || B.NetName == 'T27' || B.NetName == 'T28')"))
+
+# Lado do cabo do transformador: potencial do modulo vizinho (ate 117,6 V a mais
+# em operacao normal; ate 588 V em falha). FSAE EV.7.5.7, 300-600 V, sob verniz: 4,0 mm.
+(rule "WIRE_IN isolado"
+    (constraint clearance (min 4.0mm))
+    (constraint creepage (min 4.0mm))
+    (condition "A.NetName == 'WIRE_IN_*' && B.NetName != 'WIRE_IN_*' && B.NetName != ''"))
+
+# Corrente de balanceamento (~0,44 A): tomadas, dreno do PMOS e R_BAL
+(rule "trilhas de balanceamento"
+    (constraint track_width (min 0.4mm))
+    (condition "A.NetName == 'T??' || A.NetName == 'NetQ*'"))
