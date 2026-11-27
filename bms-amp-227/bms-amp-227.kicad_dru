@@ -9,7 +9,7 @@
 
 (rule "fanout TLE9012"
     (constraint clearance (min 0.2mm))
-    (condition "A.memberOfFootprint('U?') && B.memberOfFootprint('U?')"))
+    (condition "A.memberOfFootprint('U?') && (B.memberOfFootprint('U?') || B.intersectsCourtyard('U?'))"))
 
 (rule "isolamento T00 > 30 V"
     (layer outer)
@@ -173,3 +173,19 @@
 (rule "trilhas de balanceamento"
     (constraint track_width (min 0.25mm))
     (condition "(A.NetName == 'T??' || A.NetName == 'NetQ*') && A.NetName != 'T00' && A.NetName != 'T07' && A.NetName != 'T14' && A.NetName != 'T21'"))
+
+# Via-in-pad nos pinos sem saida dos TLE9012 (17/TMP1, 21/PWM0, 18/TMP0 e alguns do lado 37-48):
+# o bolso entre os GNDs 15/19/22 e o pad exposto nao comporta 3 vias de 0,5 mm, e por fora nao ha saida.
+# Via 0,30/0,15 dentro do pad (pad de 0,29 mm), epoxy filled & capped: a via cabe na largura do pad e a
+# folga ate o pino vizinho fica em ~0,20 mm (JLC: via min. 0,15/0,25 mm; pad SMD a pad SMD 0,15 mm).
+(rule "via-in-pad TLE9012: tamanho"
+    (constraint via_diameter (min 0.3mm))
+    (constraint hole_size (min 0.15mm))
+    (constraint annular_width (min 0.075mm))
+    (condition "A.Type == 'Via' && A.intersectsCourtyard('U?')"))
+
+# Pads de GND no bottom presos ao plano por um raio so (sem espaco para o segundo).
+# R182 e C59 tambem tem toco + via ate os planos internos; C81 e C134 ficam com o raio.
+(rule "GND com um raio termico"
+    (constraint min_resolved_spokes 1)
+    (condition "A.Type == 'Pad' && (A.memberOfFootprint('R182') || A.memberOfFootprint('C59') || A.memberOfFootprint('C81') || A.memberOfFootprint('C134'))"))
