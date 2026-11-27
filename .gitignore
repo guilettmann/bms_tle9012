@@ -56,3 +56,8 @@ desktop.ini
 #   *.ld                 -> linker scripts, alterados na fase 4
 #   Drivers/             -> HAL/CMSIS gerados; necessarios para compilar
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Imagens da placa (renders, exports e artes de origem): ficam so locais
+# ---------------------------------------------------------------------------
+bms-amp-227/imagens/
